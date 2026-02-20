@@ -2,35 +2,29 @@ import Link from 'next/link'
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-white p-24">
-      <h1 className="text-6xl font-bold tracking-tighter text-blue-500">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-white p-6 text-center">
+      <h1 className="text-6xl md:text-8xl font-bold tracking-tighter text-blue-500">
         Guardian
       </h1>
-      <p className="mt-4 text-xl text-slate-400">
-        El ecosistema profesional para la salud en Córdoba.
+      <p className="mt-6 text-xl text-slate-400 max-w-lg">
+        El estándar profesional para la gestión de guardias médicas y talento en Córdoba.
       </p>
       
-      <div className="mt-10 flex flex-col md:flex-row gap-4">
-        {/* Botón para Médicos: va al registro/perfil */}
+      <div className="mt-12 flex flex-col md:flex-row gap-4 w-full max-w-md justify-center">
+        <Link 
+          href="/login" 
+          className="px-8 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold transition-all text-center w-full md:w-auto shadow-lg shadow-blue-900/20"
+        >
+          Iniciar Sesión
+        </Link>
+
         <Link 
           href="/registro" 
-          className="px-8 py-3 bg-blue-600 hover:bg-blue-700 rounded-full font-semibold transition-all text-center"
+          className="px-8 py-3 bg-slate-800 text-white hover:bg-slate-700 border border-slate-700 rounded-xl font-bold transition-all text-center w-full md:w-auto"
         >
-          Soy Médico
-        </Link>
-
-        {/* Botón para Clínicas: va a publicar guardia */}
-        <Link 
-          href="/publicar" 
-          className="px-8 py-3 bg-white text-black hover:bg-slate-200 rounded-full font-semibold transition-all text-center"
-        >
-          Soy Clínica (Publicar)
+          Crear Cuenta
         </Link>
       </div>
-
-      <Link href="/dashboard" className="mt-8 text-slate-500 hover:text-blue-400 underline decoration-slate-700">
-        Ver tablero de guardias activas
-      </Link>
     </main>
   );
 }

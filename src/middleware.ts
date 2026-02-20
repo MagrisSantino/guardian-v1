@@ -3,9 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request: { headers: request.headers },
   })
 
   const supabase = createServerClient(
@@ -13,25 +11,15 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
+        get(name: string) { return request.cookies.get(name)?.value },
         set(name: string, value: string, options: CookieOptions) {
           request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
+          response = NextResponse.next({ request: { headers: request.headers } })
           response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
           request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
+          response = NextResponse.next({ request: { headers: request.headers } })
           response.cookies.set({ name, value: '', ...options })
         },
       },
@@ -40,12 +28,18 @@ export async function middleware(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession()
 
-  // Protección de rutas: si no hay sesión, redirigimos a registro
-  const protectedRoutes = ['/perfil', '/dashboard-clinica', '/dashboard-medico']
+  const protectedRoutes = ['/perfil', '/dashboard-clinica', '/dashboard-medico', '/publicar']
   const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
 
+  // Si no hay sesión y quiere entrar a un panel, lo mandamos al LOGIN
   if (!session && isProtectedRoute) {
-    return NextResponse.redirect(new URL('/registro', request.url))
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Si YA tiene sesión e intenta ir al login o registro, lo mandamos a su panel
+  if (session && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/registro')) {
+    // Nota: Como el middleware es rápido, lo mandamos al index o a un validador si no sabemos su rol
+    return NextResponse.redirect(new URL('/', request.url)) 
   }
 
   return response
