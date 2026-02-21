@@ -13,46 +13,65 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       alert("Error: " + error.message)
       setLoading(false)
     } else {
-      // Magia de ruteo: Buscamos el rol del usuario en la base de datos
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single()
-
-      // Redirección perfecta según quién sea
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
+      
       if (profile?.role === 'clinic_admin') {
         router.push('/dashboard-clinica')
       } else {
+        // PRECARGA OPTIMISTA PARA MÉDICOS: Bajamos la info antes de que cambie de página
+        const [openRes, myRes] = await Promise.all([
+          supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('status', 'open').order('date_time', { ascending: true }),
+          supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('professional_id', data.user.id).eq('status', 'filled')
+        ])
+        
+        // Guardamos las fotos en memoria
+        if (openRes.data) sessionStorage.setItem('medico_feed_cache', JSON.stringify(openRes.data))
+        
+        const allCalendarShifts = [...(openRes.data || []), ...(myRes.data || [])]
+        sessionStorage.setItem('medico_calendar_cache', JSON.stringify(allCalendarShifts))
+
+        // Ahora sí lo mandamos al tablero
         router.push('/dashboard-medico')
       }
     }
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-white p-6">
-      <form onSubmit={handleLogin} className="bg-slate-900 p-8 rounded-2xl border border-slate-800 w-full max-w-md shadow-2xl">
-        <h2 className="text-3xl font-bold mb-2 text-blue-500 text-center">Ingresar a Guardian</h2>
-        <p className="text-slate-400 text-center mb-8 text-sm">Accedé a tu panel de control</p>
-        
-        <input type="email" placeholder="Email" className="w-full p-3 mb-4 bg-slate-800 border border-slate-700 rounded-xl outline-none focus:border-blue-500 transition-all" onChange={(e) => setEmail(e.target.value)} required />
-        <input type="password" placeholder="Contraseña" className="w-full p-3 mb-6 bg-slate-800 border border-slate-700 rounded-xl outline-none focus:border-blue-500 transition-all" onChange={(e) => setPassword(e.target.value)} required />
-        
-        <button disabled={loading} className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 rounded-xl font-bold transition-all mb-4">
-          {loading ? 'Ingresando...' : 'Entrar'}
-        </button>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-blue-50/30 p-6">
+      <div className="w-full max-w-md bg-white p-10 rounded-2xl shadow-xl border border-blue-100/80">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-slate-900">Iniciar Sesión</h1>
+          <p className="text-slate-500 text-sm mt-2">Ingresa tus credenciales para acceder</p>
+        </div>
 
-        <p className="text-center text-slate-400 text-sm">
-          ¿No tenés cuenta? <Link href="/registro" className="text-blue-400 hover:underline font-bold">Registrate acá</Link>
-        </p>
-      </form>
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Email</label>
+            <input type="email" placeholder="Ej: usuario@clinica.com" className="w-full px-4 py-3 bg-blue-50/20 text-slate-900 border border-blue-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Contraseña</label>
+            <input type="password" placeholder="••••••••" className="w-full px-4 py-3 bg-blue-50/20 text-slate-900 border border-blue-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+          
+          <div className="pt-2">
+            <button disabled={loading} className="w-full py-3.5 bg-slate-900 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-blue-200 disabled:opacity-70">
+              {loading ? 'Ingresando...' : 'Ingresar al Sistema'}
+            </button>
+          </div>
+
+          <p className="text-center text-slate-500 text-sm mt-6">
+            ¿No tenés cuenta? <Link href="/registro" className="text-blue-600 hover:underline font-semibold">Registrate acá</Link>
+          </p>
+        </form>
+      </div>
     </main>
   )
 }

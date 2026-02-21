@@ -15,62 +15,57 @@ export default function Registro() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { 
-          full_name: name,
-          role: role 
-        }
-      }
-    })
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name, role: role } } })
     setLoading(false)
-    
-    if (error) {
-      alert(error.message)
-    } else {
+    if (error) alert(error.message)
+    else {
       alert('¡Cuenta creada con éxito! Por favor, iniciá sesión.')
-      router.push('/login') // Vuelve a la página de login
+      router.push('/login')
     }
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-white p-6">
-      <form onSubmit={handleSignUp} className="bg-slate-900 p-8 rounded-2xl border border-slate-800 w-full max-w-md shadow-2xl">
-        <h2 className="text-3xl font-bold mb-2 text-blue-500 text-center">Unirse a Guardian</h2>
-        <p className="text-slate-400 text-center mb-6 text-sm">Seleccioná tu tipo de perfil para comenzar</p>
-        
-        {/* Selector de Rol Profesional */}
-        <div className="flex gap-2 mb-6 bg-slate-800 p-1 rounded-xl">
-          <button 
-            type="button"
-            onClick={() => setRole('doctor')}
-            className={`flex-1 py-2 rounded-lg font-bold transition-all ${role === 'doctor' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-          >
-            Soy Médico
-          </button>
-          <button 
-            type="button"
-            onClick={() => setRole('clinic_admin')}
-            className={`flex-1 py-2 rounded-lg font-bold transition-all ${role === 'clinic_admin' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-          >
-            Soy Clínica
-          </button>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+      <div className="w-full max-w-md bg-white p-10 rounded-2xl shadow-xl border border-slate-100">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-slate-900">Crear Cuenta</h1>
+          <p className="text-slate-500 text-sm mt-2">Seleccioná tu perfil para comenzar</p>
         </div>
 
-        <input type="text" placeholder={role === 'doctor' ? "Nombre Completo" : "Razón Social de la Clínica"} className="w-full p-3 mb-4 bg-slate-800 border border-slate-700 rounded-xl outline-none focus:border-blue-500 transition-all" onChange={(e) => setName(e.target.value)} required />
-        <input type="email" placeholder="Email profesional" className="w-full p-3 mb-4 bg-slate-800 border border-slate-700 rounded-xl outline-none focus:border-blue-500 transition-all" onChange={(e) => setEmail(e.target.value)} required />
-        <input type="password" placeholder="Contraseña (mínimo 6 caracteres)" className="w-full p-3 mb-6 bg-slate-800 border border-slate-700 rounded-xl outline-none focus:border-blue-500 transition-all" onChange={(e) => setPassword(e.target.value)} required />
-        
-        <button disabled={loading} className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 rounded-xl font-bold transition-all mb-4">
-          {loading ? 'Creando cuenta...' : 'Crear mi cuenta'}
-        </button>
+        <form onSubmit={handleSignUp} className="space-y-5">
+          <div className="flex gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
+            <button type="button" onClick={() => setRole('doctor')} className={`flex-1 py-2.5 rounded-lg font-semibold transition-all text-sm ${role === 'doctor' ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>
+              Soy Médico
+            </button>
+            <button type="button" onClick={() => setRole('clinic_admin')} className={`flex-1 py-2.5 rounded-lg font-semibold transition-all text-sm ${role === 'clinic_admin' ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>
+              Soy Clínica
+            </button>
+          </div>
 
-        <p className="text-center text-slate-400 text-sm">
-          ¿Ya tenés cuenta? <Link href="/login" className="text-blue-400 hover:underline font-bold">Iniciá sesión acá</Link>
-        </p>
-      </form>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">{role === 'doctor' ? "Nombre Completo" : "Razón Social"}</label>
+            <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Email</label>
+            <input type="email" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Contraseña</label>
+            <input type="password" placeholder="••••••••" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+          
+          <div className="pt-2">
+            <button disabled={loading} className="w-full py-3.5 bg-slate-900 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-blue-200 disabled:opacity-70">
+              {loading ? 'Creando cuenta...' : 'Crear mi cuenta'}
+            </button>
+          </div>
+
+          <p className="text-center text-slate-500 text-sm mt-6">
+            ¿Ya tenés cuenta? <Link href="/login" className="text-blue-600 hover:underline font-semibold">Iniciá sesión acá</Link>
+          </p>
+        </form>
+      </div>
     </main>
   )
 }
