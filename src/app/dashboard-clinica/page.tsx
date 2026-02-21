@@ -36,21 +36,43 @@ function DashboardClinicaContent() {
     if (data) setMyShifts(data)
   }
 
-  // MAGIA DEL ENLACE PROFUNDO
+  // --- LÓGICA DE NOTIFICACIONES CORREGIDA (DEEP LINK AGRESIVO) ---
   useEffect(() => {
-    if (myShifts.length > 0 && shiftIdParam) {
-      const shift = myShifts.find(s => s.id === shiftIdParam);
-      if (shift && !shiftToManage) {
-        handleShiftClick({ stopPropagation: () => {} } as any, shift);
-        router.replace(pathname, { scroll: false });
-      }
+    if (shiftIdParam) {
+      // 1. Refrescamos la lista de guardias en el fondo
+      fetchMyShifts().then(() => {
+        // 2. Vamos a buscar la guardia exacta de la notificación 100% fresca a la BD
+        supabase.from('shifts')
+          .select('*, applicants:shift_applications(status)')
+          .eq('id', shiftIdParam)
+          .single()
+          .then(({ data: shift }) => {
+            if (shift) {
+              setShiftToManage(shift);
+              setIsPostulantesOpen(false); // Cerramos por si había otro abierto
+              setIsCalificarOpen(false);
+              
+              // 3. Abrimos el correcto
+              if (shift.status === 'open') setIsPostulantesOpen(true);
+              else if (shift.status === 'filled') setIsCalificarOpen(true);
+              else if (shift.status === 'completed') alert('Esta guardia ya fue completada y el profesional fue calificado.');
+              
+              // 4. Limpiamos la URL para no reabrirlo al refrescar
+              router.replace(pathname, { scroll: false });
+            }
+          });
+      });
     }
-  }, [myShifts, shiftIdParam])
+  }, [shiftIdParam, pathname, router])
 
   const handleDayClick = (day: Date) => { setSelectedDateForModal(day); setIsPublicarOpen(true); }
 
   const handleShiftClick = (e: React.MouseEvent, shift: any) => { 
-    e.stopPropagation(); setShiftToManage(shift); 
+    e.stopPropagation(); 
+    setShiftToManage(shift); 
+    setIsPostulantesOpen(false);
+    setIsCalificarOpen(false);
+    
     if (shift.status === 'open') setIsPostulantesOpen(true); 
     else if (shift.status === 'filled') setIsCalificarOpen(true);
     else if (shift.status === 'completed') alert('Esta guardia ya fue completada y el profesional fue calificado.');
@@ -128,7 +150,6 @@ function DashboardClinicaContent() {
   )
 }
 
-// ENVOLTURA PARA NEXT.JS
 export default function DashboardClinica() {
   return (<Suspense fallback={<div>Cargando...</div>}><DashboardClinicaContent /></Suspense>)
 }

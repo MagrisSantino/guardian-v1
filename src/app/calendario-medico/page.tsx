@@ -45,16 +45,40 @@ function CalendarioMedicoContent() {
     sessionStorage.setItem('medico_calendar_cache', JSON.stringify(uniqueShifts))
   }
 
-  // MAGIA DEL ENLACE PROFUNDO
+  // --- LÓGICA DE NOTIFICACIONES CORREGIDA (DEEP LINK AGRESIVO) ---
   useEffect(() => {
-    if (shifts.length > 0 && shiftIdParam) {
-      const shift = shifts.find(s => s.id === shiftIdParam);
-      if (shift && !selectedShift) {
-        handleShiftClick(shift);
-        router.replace(pathname, { scroll: false });
-      }
+    if (shiftIdParam && userId) {
+      // 1. Refrescamos el tablero
+      fetchData().then(() => {
+        // 2. Traemos la guardia afectada fresca de la BD
+        supabase.from('shifts')
+          .select('*, clinic:profiles!clinic_id(full_name)')
+          .eq('id', shiftIdParam)
+          .single()
+          .then(({ data: shift }) => {
+            if (shift) {
+              // 3. Verificamos su estado de postulación real
+              supabase.from('shift_applications')
+                .select('id')
+                .eq('shift_id', shift.id)
+                .eq('professional_id', userId)
+                .eq('status', 'pending')
+                .single()
+                .then(({ data: app }) => {
+                  let status = 'disponible';
+                  if (shift.status === 'completed' && shift.professional_id === userId) status = 'completada';
+                  else if (shift.status === 'filled' && shift.professional_id === userId) status = 'confirmado';
+                  else if (app) status = 'postulado';
+                  
+                  setSelectedShift(shift);
+                  setSelectedUserStatus(status);
+                  router.replace(pathname, { scroll: false }); // Limpiamos URL
+                });
+            }
+          });
+      });
     }
-  }, [shifts, shiftIdParam])
+  }, [shiftIdParam, userId, pathname, router])
 
   const getUserStatus = (shift: any) => {
     if (shift.status === 'completed' && shift.professional_id === userId) return 'completada'
@@ -138,7 +162,6 @@ function CalendarioMedicoContent() {
   )
 }
 
-// ENVOLTURA PARA NEXT.JS
 export default function CalendarioMedico() {
   return (<Suspense fallback={<div>Cargando...</div>}><CalendarioMedicoContent /></Suspense>)
 }
