@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import PublicarModal from './PublicarModal'
-import { LogOut, Bell } from 'lucide-react'
+import { LogOut, Bell, ShieldPlus } from 'lucide-react' // <-- Sumamos el ícono ShieldPlus
 
 export default function Navbar() {
   const [user, setUser] = useState<any>(null)
@@ -18,7 +18,6 @@ export default function Navbar() {
   const pathname = usePathname()
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Calculamos cuántas no están leídas
   const unreadCount = notifications.filter(n => !n.is_read).length
 
   useEffect(() => {
@@ -69,12 +68,8 @@ export default function Navbar() {
   }
 
   const toggleNotifications = async () => {
-    // Si abrimos la campana, refrescamos los datos para ver si hay algo nuevo
     if (!showNotifications && user) await fetchNotifications(user.id) 
-    
     setShowNotifications(!showNotifications)
-    
-    // Al cerrar, las marcamos como leídas
     if (showNotifications) handleMarkAsRead() 
   }
 
@@ -86,7 +81,6 @@ export default function Navbar() {
       setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n))
     }
 
-    // REDIRECCIÓN (DEEP LINK)
     if (notif.shift_id) {
       if (role === 'doctor') {
         router.push(`/calendario-medico?shiftId=${notif.shift_id}`)
@@ -101,10 +95,22 @@ export default function Navbar() {
     router.push('/')
   }
 
+  // --- COMPONENTE DE LOGO REUTILIZABLE ---
+  const BrandLogo = () => (
+    <div className="flex items-center gap-2.5 group">
+      <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-1.5 rounded-lg shadow-md group-hover:scale-105 group-hover:shadow-blue-500/20 transition-all duration-300">
+        <ShieldPlus className="w-5 h-5 text-white" strokeWidth={2.5} />
+      </div>
+      <span className="text-xl font-black tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+        Guardian
+      </span>
+    </div>
+  )
+
   if (pathname === '/login' || pathname === '/registro') {
     return (
       <nav className="flex justify-between items-center px-8 py-5 bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
-        <Link href="/" className="text-2xl font-bold tracking-wider text-blue-400">GUARDIAN</Link>
+        <Link href="/" className="focus:outline-none"><BrandLogo /></Link>
         <Link href="/" className="text-slate-400 hover:text-white font-medium text-sm transition-colors">← Volver</Link>
       </nav>
     )
@@ -113,7 +119,7 @@ export default function Navbar() {
   return (
     <>
       <nav className="flex justify-between items-center px-6 md:px-8 py-4 bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl">
-        <Link href="/" className="text-2xl font-bold tracking-wider text-blue-400 hover:text-blue-300 transition-colors">GUARDIAN</Link>
+        <Link href="/" className="focus:outline-none"><BrandLogo /></Link>
         
         <div className="flex gap-4 md:gap-6 items-center">
           {!user ? (
@@ -140,11 +146,9 @@ export default function Navbar() {
 
               <div className="w-px h-6 bg-slate-700 hidden md:block"></div>
               
-              {/* --- CAMPANA DE NOTIFICACIONES --- */}
               <div className="relative" ref={dropdownRef}>
                 <button onClick={toggleNotifications} className="relative p-2 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-slate-800 focus:outline-none">
                   <Bell className="h-6 w-6" />
-                  {/* PUNTO ROJO GIGANTE */}
                   {unreadCount > 0 && (
                     <span className="absolute top-1 right-1.5 h-3.5 w-3.5 bg-red-500 rounded-full border-2 border-slate-900 shadow-sm"></span>
                   )}
