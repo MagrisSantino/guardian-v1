@@ -2,10 +2,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import ExplorarGuardiaModal from '@/components/ExplorarGuardiaModal'
-import SkeletonGuardia from '@/components/SkeletonGuardia' // <--- IMPORTAMOS EL SKELETON
+import SkeletonGuardia from '@/components/SkeletonGuardia' 
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Search, Filter } from 'lucide-react' // <--- ICONOS PARA EL BUSCADOR
+import { Search, Filter } from 'lucide-react' 
 
 export default function DashboardMedico() {
   const [shifts, setShifts] = useState<any[]>(() => {
@@ -16,13 +16,20 @@ export default function DashboardMedico() {
     return []
   })
   
-  const [myApplications, setMyApplications] = useState<string[]>([]) 
+  // --- MAGIA: CACHÉ SÍNCRONO DE POSTULACIONES ---
+  const [myApplications, setMyApplications] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('medico_apps_cache')
+      return cached ? JSON.parse(cached) : []
+    }
+    return []
+  }) 
+  
   const [loadingBtn, setLoadingBtn] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
-  const [isFetching, setIsFetching] = useState(true) // <--- ESTADO PARA SABER SI ESTÁ CARGANDO DE LA BD
+  const [isFetching, setIsFetching] = useState(true) 
   const [selectedShift, setSelectedShift] = useState<any>(null)
 
-  // ESTADOS PARA FILTROS
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedSpecialty, setSelectedSpecialty] = useState('Todas')
 
@@ -43,7 +50,11 @@ export default function DashboardMedico() {
       setShifts(shiftsData)
       sessionStorage.setItem('medico_feed_cache', JSON.stringify(shiftsData))
     }
-    if (appsData) setMyApplications(appsData.map(a => a.shift_id))
+    if (appsData) {
+      const apps = appsData.map(a => a.shift_id)
+      setMyApplications(apps)
+      sessionStorage.setItem('medico_apps_cache', JSON.stringify(apps))
+    }
     
     setIsFetching(false)
   }
@@ -52,9 +63,14 @@ export default function DashboardMedico() {
     setLoadingBtn(shiftId)
     const { data: { session } } = await supabase.auth.getSession()
     
-    await supabase.from('shift_applications').insert([{ shift_id: shiftId, professional_id: session?.user.id, status: 'pending' }])
+    const { error } = await supabase.from('shift_applications').insert([{ shift_id: shiftId, professional_id: session?.user.id, status: 'pending' }])
     
-    // AVISO A LA CLÍNICA
+    if (error) {
+      alert('Error al postularse: ' + error.message)
+      setLoadingBtn(null)
+      return;
+    }
+
     const shift = shifts.find(s => s.id === shiftId);
     if (shift && shift.clinic_id) {
       await supabase.from('notifications').insert([{
@@ -66,7 +82,12 @@ export default function DashboardMedico() {
     }
 
     alert('¡Postulación enviada a la clínica con éxito!')
-    setMyApplications([...myApplications, shiftId])
+    
+    // --- ACTUALIZAMOS ESTADO Y CACHÉ AL INSTANTE ---
+    const newApps = [...myApplications, shiftId]
+    setMyApplications(newApps)
+    sessionStorage.setItem('medico_apps_cache', JSON.stringify(newApps))
+    
     setLoadingBtn(null)
   }
 
@@ -74,12 +95,23 @@ export default function DashboardMedico() {
     if (!confirm('¿Querés retirar tu postulación para esta guardia?')) return;
     setLoadingBtn(shiftId)
     const { data: { session } } = await supabase.auth.getSession()
-    await supabase.from('shift_applications').delete().eq('shift_id', shiftId).eq('professional_id', session?.user.id)
-    setMyApplications(myApplications.filter(id => id !== shiftId))
+    
+    const { error } = await supabase.from('shift_applications').delete().eq('shift_id', shiftId).eq('professional_id', session?.user.id)
+    
+    if (error) {
+      alert('Error al cancelar: ' + error.message)
+      setLoadingBtn(null)
+      return;
+    }
+
+    // --- ACTUALIZAMOS ESTADO Y CACHÉ AL INSTANTE ---
+    const newApps = myApplications.filter(id => id !== shiftId)
+    setMyApplications(newApps)
+    sessionStorage.setItem('medico_apps_cache', JSON.stringify(newApps))
+    
     setLoadingBtn(null)
   }
 
-  // --- LÓGICA DE FILTRADO ---
   const filteredShifts = shifts.filter(shift => {
     const matchesSearch = (shift.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            shift.clinic?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -87,7 +119,6 @@ export default function DashboardMedico() {
     return matchesSearch && matchesSpecialty;
   });
 
-  // Extraemos especialidades únicas para armar el dropdown automáticamente
   const uniqueSpecialties = ['Todas', ...Array.from(new Set(shifts.map(s => s.specialty_required).filter(Boolean)))];
 
   if (!mounted) return <main className="min-h-[calc(100vh-73px)] bg-slate-50 p-6 md:p-8"></main>
@@ -105,7 +136,6 @@ export default function DashboardMedico() {
           </span>
         </div>
 
-        {/* --- BARRA DE BÚSQUEDA Y FILTROS --- */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
@@ -131,12 +161,9 @@ export default function DashboardMedico() {
           </div>
         </div>
 
-        {/* --- GRILLA DE RESULTADOS --- */}
         {isFetching && shifts.length === 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <SkeletonGuardia />
-            <SkeletonGuardia />
-            <SkeletonGuardia />
+            <SkeletonGuardia /><SkeletonGuardia /><SkeletonGuardia />
           </div>
         ) : filteredShifts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm">

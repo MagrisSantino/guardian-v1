@@ -7,8 +7,24 @@ import { es } from 'date-fns/locale'
 import { useSearchParams, usePathname, useRouter } from 'next/navigation' 
 
 function CalendarioMedicoContent() {
-  const [shifts, setShifts] = useState<any[]>([])
-  const [myApplications, setMyApplications] = useState<string[]>([]) 
+  // --- CARGA SÍNCRONA DE GUARDIAS DE LA CACHÉ ---
+  const [shifts, setShifts] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('medico_calendar_cache')
+      return cached ? JSON.parse(cached) : []
+    }
+    return []
+  })
+
+  // --- CARGA SÍNCRONA DE POSTULACIONES DE LA CACHÉ ---
+  const [myApplications, setMyApplications] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('medico_apps_cache')
+      return cached ? JSON.parse(cached) : []
+    }
+    return []
+  }) 
+  
   const [currentDate, setCurrentDate] = useState(new Date())
   const [userId, setUserId] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -22,9 +38,6 @@ function CalendarioMedicoContent() {
 
   useEffect(() => { 
     setMounted(true)
-    const hasDeepLink = !!shiftIdParam;
-    const cached = sessionStorage.getItem('medico_calendar_cache')
-    if (cached && !hasDeepLink) setShifts(JSON.parse(cached))
     fetchData() 
   }, [shiftIdParam])
 
@@ -37,7 +50,12 @@ function CalendarioMedicoContent() {
     const { data: myShifts } = await supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('professional_id', session.user.id)
     const { data: appsData } = await supabase.from('shift_applications').select('shift_id').eq('professional_id', session.user.id).eq('status', 'pending')
     
-    if (appsData) setMyApplications(appsData.map(a => a.shift_id))
+    // Guardamos las nuevas postulaciones en estado y caché
+    if (appsData) {
+      const apps = appsData.map(a => a.shift_id)
+      setMyApplications(apps)
+      sessionStorage.setItem('medico_apps_cache', JSON.stringify(apps))
+    }
 
     const combined = [...(openShifts || []), ...(myShifts || [])]
     const uniqueShifts = Array.from(new Map(combined.map(item => [item.id, item])).values())
@@ -45,19 +63,15 @@ function CalendarioMedicoContent() {
     sessionStorage.setItem('medico_calendar_cache', JSON.stringify(uniqueShifts))
   }
 
-  // --- LÓGICA DE NOTIFICACIONES CORREGIDA (DEEP LINK AGRESIVO) ---
   useEffect(() => {
     if (shiftIdParam && userId) {
-      // 1. Refrescamos el tablero
       fetchData().then(() => {
-        // 2. Traemos la guardia afectada fresca de la BD
         supabase.from('shifts')
           .select('*, clinic:profiles!clinic_id(full_name)')
           .eq('id', shiftIdParam)
           .single()
           .then(({ data: shift }) => {
             if (shift) {
-              // 3. Verificamos su estado de postulación real
               supabase.from('shift_applications')
                 .select('id')
                 .eq('shift_id', shift.id)
@@ -72,7 +86,7 @@ function CalendarioMedicoContent() {
                   
                   setSelectedShift(shift);
                   setSelectedUserStatus(status);
-                  router.replace(pathname, { scroll: false }); // Limpiamos URL
+                  router.replace(pathname, { scroll: false }); 
                 });
             }
           });
