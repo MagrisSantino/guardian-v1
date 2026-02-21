@@ -25,6 +25,18 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: session?.user.id, status: 'pending' }])
+    
+    // AVISO A LA CLÍNICA (Nueva postulación)
+    const targetClinicId = shift.clinic_id || shift.clinic?.id;
+    if (targetClinicId) {
+      await supabase.from('notifications').insert([{
+        user_id: targetClinicId,
+        shift_id: shift.id,
+        title: '¡Nueva Postulación! 👨‍⚕️',
+        message: `Un profesional se acaba de postular a tu guardia: ${shift.title}.`
+      }])
+    }
+
     alert('¡Postulación enviada a la clínica!')
     onRefresh(); onClose();
   }
@@ -46,8 +58,22 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     if (!confirm(msg)) return;
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
+    
+    // 1. Liberamos la guardia y borramos la postulación
     await supabase.from('shifts').update({ status: 'open', professional_id: null }).eq('id', shift.id)
     await supabase.from('shift_applications').delete().eq('shift_id', shift.id).eq('professional_id', session?.user.id)
+    
+    // 2. AVISO DE EMERGENCIA A LA CLÍNICA
+    const targetClinicId = shift.clinic_id || shift.clinic?.id;
+    if (targetClinicId) {
+      await supabase.from('notifications').insert([{
+        user_id: targetClinicId,
+        shift_id: shift.id,
+        title: '¡Baja de Profesional! ⚠️',
+        message: `El médico asignado se dio de baja. Tu guardia "${shift.title}" vuelve a estar abierta para postulaciones.`
+      }])
+    }
+
     alert('Guardia cancelada.')
     onRefresh(); onClose();
   }
@@ -123,7 +149,6 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
                     <button key={star} type="button" onClick={() => setRating(star)} className={`text-3xl transition-all hover:scale-110 ${star <= rating ? 'text-amber-400' : 'text-slate-300'}`}>★</button>
                   ))}
                 </div>
-                {/* --- LETRA NEGRA Y GRUESA AQUÍ --- */}
                 <textarea 
                   value={comment} 
                   onChange={e => setComment(e.target.value)} 

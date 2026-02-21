@@ -51,7 +51,20 @@ export default function DashboardMedico() {
   const handleApply = async (shiftId: string) => {
     setLoadingBtn(shiftId)
     const { data: { session } } = await supabase.auth.getSession()
+    
     await supabase.from('shift_applications').insert([{ shift_id: shiftId, professional_id: session?.user.id, status: 'pending' }])
+    
+    // AVISO A LA CLÍNICA
+    const shift = shifts.find(s => s.id === shiftId);
+    if (shift && shift.clinic_id) {
+      await supabase.from('notifications').insert([{
+        user_id: shift.clinic_id,
+        shift_id: shiftId,
+        title: '¡Nueva Postulación! 👨‍⚕️',
+        message: `Un profesional se acaba de postular a tu guardia: ${shift.title}.`
+      }])
+    }
+
     alert('¡Postulación enviada a la clínica con éxito!')
     setMyApplications([...myApplications, shiftId])
     setLoadingBtn(null)

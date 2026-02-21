@@ -57,6 +57,14 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
     await supabase.from('shift_applications').update({ status: 'accepted' }).eq('id', applicationId)
     await supabase.from('shift_applications').update({ status: 'rejected' }).eq('shift_id', shift.id).eq('status', 'pending')
 
+    // AVISO AL MÉDICO
+    await supabase.from('notifications').insert([{
+      user_id: professionalId,
+      shift_id: shift.id, 
+      title: '¡Guardia Asignada! 🎉',
+      message: `Fuiste seleccionado para cubrir la guardia en ${shift.title}. Revisá tu Agenda.`
+    }])
+
     alert('¡Médico asignado correctamente!')
     onRefresh()
     onClose()

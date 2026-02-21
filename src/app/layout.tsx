@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar"; // Importamos el Navbar que creamos
+import Navbar from "@/components/Navbar";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Configuramos la tipografía Inter
+const inter = Inter({
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -26,9 +23,10 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-950`}
+        // Inyectamos la variable de la fuente y activamos el antialiasing para que se vea suave
+        className={`${inter.variable} font-sans antialiased bg-slate-950`}
       >
-        <Navbar /> {/* El Navbar queda fijo arriba de todo */}
+        <Navbar />
         {children}
       </body>
     </html>
