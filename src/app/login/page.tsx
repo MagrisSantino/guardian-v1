@@ -43,22 +43,34 @@ export default function Login() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-blue-50/30 p-6">
-      <div className="w-full max-w-md bg-white p-10 rounded-2xl shadow-xl border border-blue-100/80">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+      <div className="w-full max-w-md bg-white p-10 rounded-2xl shadow-xl border border-slate-100">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-slate-900">Iniciar Sesión</h1>
-          <p className="text-slate-500 text-sm mt-2">Ingresa tus credenciales para acceder</p>
+          <p className="text-slate-500 text-sm mt-2">Ingresá tus credenciales para acceder</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Email</label>
-            <input type="email" placeholder="Ej: usuario@clinica.com" className="w-full px-4 py-3 bg-blue-50/20 text-slate-900 border border-blue-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" onChange={(e) => setEmail(e.target.value)} required />
+            <input 
+              type="email" 
+              placeholder="Ej: usuario@clinica.com" 
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" 
+              onChange={(e) => setEmail(e.target.value)} 
+              required 
+            />
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Contraseña</label>
-            <input type="password" placeholder="••••••••" className="w-full px-4 py-3 bg-blue-50/20 text-slate-900 border border-blue-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" onChange={(e) => setPassword(e.target.value)} required />
+            <input 
+              type="password" 
+              placeholder="••••••••" 
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" 
+              onChange={(e) => setPassword(e.target.value)} 
+              required 
+            />
           </div>
           
           <div className="pt-2">

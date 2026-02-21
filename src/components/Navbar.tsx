@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import PublicarModal from './PublicarModal'
-import { LogOut, Bell, ShieldPlus } from 'lucide-react' // <-- Sumamos el ícono ShieldPlus
+import { LogOut, Bell, ShieldPlus } from 'lucide-react'
 
 export default function Navbar() {
   const [user, setUser] = useState<any>(null)
@@ -107,6 +107,7 @@ export default function Navbar() {
     </div>
   )
 
+  // Si estamos en Login o Registro, el logo te lleva al inicio
   if (pathname === '/login' || pathname === '/registro') {
     return (
       <nav className="flex justify-between items-center px-8 py-5 bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
@@ -119,7 +120,13 @@ export default function Navbar() {
   return (
     <>
       <nav className="flex justify-between items-center px-6 md:px-8 py-4 bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-xl">
-        <Link href="/" className="focus:outline-none"><BrandLogo /></Link>
+        
+        {/* LÓGICA INTELIGENTE DEL LOGO */}
+        {user ? (
+          <div className="focus:outline-none cursor-default select-none"><BrandLogo /></div>
+        ) : (
+          <Link href="/" className="focus:outline-none"><BrandLogo /></Link>
+        )}
         
         <div className="flex gap-4 md:gap-6 items-center">
           {!user ? (
