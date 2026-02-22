@@ -9,15 +9,15 @@ export default function Home() {
       <section 
         className="relative px-6 pt-24 pb-32 md:pt-36 md:pb-40 flex flex-col items-center text-center overflow-hidden"
         style={{
-          /* Bajamos el blanco al 10% (0.1) arriba para que la imagen tenga colores vivos y reales */
-          backgroundImage: `linear-gradient(to bottom, rgba(248, 250, 252, 0.1), rgba(248, 250, 252, 1)), url('https://images.unsplash.com/photo-1516549655169-df83a0774514')`,
+          /* ¡ACÁ ESTÁ LA MAGIA! El mismo degradado exacto (0.2 a 0.4) y sin comillas que usamos en el Login/Registro */
+          backgroundImage: `linear-gradient(to bottom, rgba(248, 250, 252, 0.2), rgba(248, 250, 252, 0.4)), url(https://images.unsplash.com/photo-1516549655169-df83a0774514)`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           backgroundAttachment: 'fixed'
         }}
       >
-        {/* EL EFECTO CRISTAL: Envolvemos los textos en una caja translúcida para que se lean perfecto */}
+        {/* EL EFECTO CRISTAL */}
         <div className="relative z-10 flex flex-col items-center w-full max-w-5xl bg-white/40 backdrop-blur-md p-8 md:p-14 rounded-[2.5rem] border border-white/50 shadow-2xl">
           
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 border border-blue-200 text-blue-700 text-xs font-bold uppercase tracking-wider mb-8 shadow-sm">
@@ -28,11 +28,11 @@ export default function Home() {
             La Red Médica #1 de Córdoba
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900 max-w-4xl leading-[1.1]">
+          <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900 max-w-4xl leading-[1.1] drop-shadow-sm">
             Conectamos talento médico con <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-400">oportunidades reales</span>
           </h1>
           
-          <p className="mt-8 text-lg md:text-xl text-slate-800 max-w-2xl leading-relaxed font-semibold">
+          <p className="mt-8 text-lg md:text-xl text-slate-800 max-w-2xl leading-relaxed font-semibold drop-shadow-sm">
             Guardian es el ecosistema inteligente que simplifica la cobertura de guardias. Sin intermediarios, sin demoras y con un sistema de reputación que premia la excelencia.
           </p>
           
@@ -50,7 +50,7 @@ export default function Home() {
       </section>
 
       {/* 2. ESTADÍSTICAS RÁPIDAS (Banda de confianza) */}
-      <section className="border-y border-slate-200 bg-white relative z-10">
+      <section className="border-y border-slate-200 bg-white relative z-10 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-2 md:grid-cols-4 gap-8 divide-x divide-slate-100">
           <div className="text-center px-4">
             <p className="text-4xl font-black text-slate-900">0%</p>
