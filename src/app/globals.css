@@ -43,3 +43,14 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Oculta la barra de desplazamiento pero permite el scroll táctil (PWA/Mobile) */
+.custom-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.custom-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+  -webkit-overflow-scrolling: touch; /* Hace que el deslizamiento sea suave en iOS */
+  scroll-snap-type: x proximity;
+}
