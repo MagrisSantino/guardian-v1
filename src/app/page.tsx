@@ -6,49 +6,46 @@ export default function Home() {
     <main className="flex min-h-screen flex-col bg-slate-50 selection:bg-blue-200">
       
       {/* 1. HERO SECTION (Encabezado principal) */}
-      <section className="relative px-6 pt-24 pb-32 md:pt-36 md:pb-40 flex flex-col items-center text-center overflow-hidden">
-        
-        {/* --- MAGIA DEL FONDO CORREGIDA --- */}
-        {/* Usamos 'style' para la URL de la imagen y evitamos que Tailwind se confunda con los caracteres especiales */}
-        <div 
-          className="absolute inset-0 -z-30 bg-cover bg-center bg-fixed opacity-60"
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1551076805-e18690c5e561?q=80&w=2070&auto=format&fit=crop')" }}
-        ></div>
-        
-        {/* Capa de desenfoque y brillo (para que el texto negro se lea perfecto) */}
-        <div className="absolute inset-0 -z-20 bg-slate-50/70 backdrop-blur-[3px]"></div>
-        
-        {/* Degradado para que se fusione perfectamente con la sección de abajo */}
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-slate-50/60 to-slate-50"></div>
-        
-        {/* Tu fondo decorativo azul sutil */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-blue-500/20 rounded-full blur-3xl -z-10"></div>
-        {/* ----------------------- */}
+      <section 
+        className="relative px-6 pt-24 pb-32 md:pt-36 md:pb-40 flex flex-col items-center text-center overflow-hidden"
+        style={{
+          /* Bajamos el blanco al 10% (0.1) arriba para que la imagen tenga colores vivos y reales */
+          backgroundImage: `linear-gradient(to bottom, rgba(248, 250, 252, 0.1), rgba(248, 250, 252, 1)), url('https://images.unsplash.com/photo-1516549655169-df83a0774514')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        {/* EL EFECTO CRISTAL: Envolvemos los textos en una caja translúcida para que se lean perfecto */}
+        <div className="relative z-10 flex flex-col items-center w-full max-w-5xl bg-white/40 backdrop-blur-md p-8 md:p-14 rounded-[2.5rem] border border-white/50 shadow-2xl">
+          
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 border border-blue-200 text-blue-700 text-xs font-bold uppercase tracking-wider mb-8 shadow-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+            </span>
+            La Red Médica #1 de Córdoba
+          </div>
+          
+          <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900 max-w-4xl leading-[1.1]">
+            Conectamos talento médico con <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-400">oportunidades reales</span>
+          </h1>
+          
+          <p className="mt-8 text-lg md:text-xl text-slate-800 max-w-2xl leading-relaxed font-semibold">
+            Guardian es el ecosistema inteligente que simplifica la cobertura de guardias. Sin intermediarios, sin demoras y con un sistema de reputación que premia la excelencia.
+          </p>
+          
+          <div className="mt-10 flex flex-col sm:flex-row gap-4 w-full max-w-md sm:max-w-none justify-center">
+            <Link href="/registro" className="px-8 py-4 bg-slate-900 hover:bg-blue-700 text-white rounded-xl font-bold transition-all text-center flex items-center justify-center gap-2 shadow-xl hover:shadow-blue-900/20 group">
+              Crear mi Cuenta Libre
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <Link href="/login" className="px-8 py-4 bg-white/90 border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-white rounded-xl font-bold transition-all text-center shadow-sm">
+              Iniciar Sesión
+            </Link>
+          </div>
 
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 border border-blue-200 text-blue-700 text-xs font-bold uppercase tracking-wider mb-8 shadow-sm backdrop-blur-md">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-          </span>
-          La Red Médica #1 de Córdoba
-        </div>
-        
-        <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900 max-w-4xl leading-[1.1] drop-shadow-sm">
-          Conectamos talento médico con <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-400">oportunidades reales</span>
-        </h1>
-        
-        <p className="mt-8 text-lg md:text-xl text-slate-700 max-w-2xl leading-relaxed font-semibold drop-shadow-sm">
-          Guardian es el ecosistema inteligente que simplifica la cobertura de guardias. Sin intermediarios, sin demoras y con un sistema de reputación que premia la excelencia.
-        </p>
-        
-        <div className="mt-10 flex flex-col sm:flex-row gap-4 w-full max-w-md sm:max-w-none justify-center">
-          <Link href="/registro" className="px-8 py-4 bg-slate-900 hover:bg-blue-700 text-white rounded-xl font-bold transition-all text-center flex items-center justify-center gap-2 shadow-xl hover:shadow-blue-900/20 group">
-            Crear mi Cuenta Libre
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </Link>
-          <Link href="/login" className="px-8 py-4 bg-white/90 backdrop-blur-sm border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-white rounded-xl font-bold transition-all text-center shadow-sm">
-            Iniciar Sesión
-          </Link>
         </div>
       </section>
 
@@ -75,7 +72,7 @@ export default function Home() {
       </section>
 
       {/* 3. CARACTERÍSTICAS (Los Recuadros) */}
-      <section className="py-24 px-6 max-w-7xl mx-auto">
+      <section className="py-24 px-6 max-w-7xl mx-auto relative z-10">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-black text-slate-900">Todo lo que necesitas en un solo lugar</h2>
           <p className="mt-4 text-slate-500 text-lg">Herramientas diseñadas específicamente para la eficiencia del sector salud.</p>
@@ -128,7 +125,7 @@ export default function Home() {
       </section>
 
       {/* 4. SECCIÓN CÓMO FUNCIONA */}
-      <section className="bg-slate-900 text-white py-24 px-6">
+      <section className="bg-slate-900 text-white py-24 px-6 relative z-10">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-black">¿Cómo funciona Guardian?</h2>
@@ -158,7 +155,7 @@ export default function Home() {
       </section>
 
       {/* 5. NUESTRO PROPÓSITO (Identidad) */}
-      <section className="py-24 px-6 max-w-5xl mx-auto text-center">
+      <section className="py-24 px-6 max-w-5xl mx-auto text-center relative z-10">
         <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-6">Nuestro Propósito</h2>
         <p className="text-xl text-slate-600 leading-relaxed font-medium mb-8">
           En Argentina, conseguir cobertura médica de urgencia suele ser un proceso caótico y desgastante. Guardian nace para profesionalizar esta conexión. Queremos que el foco de las instituciones esté en salvar vidas, no en buscar reemplazos, y que los médicos sean valorados justamente por su responsabilidad y trato humano.
@@ -167,7 +164,7 @@ export default function Home() {
       </section>
 
       {/* 6. BOTTOM CTA (Llamado a la acción final) */}
-      <section className="bg-blue-50 py-24 px-6 text-center border-t border-blue-100">
+      <section className="bg-blue-50 py-24 px-6 text-center border-t border-blue-100 relative z-10">
         <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-6">¿Listo para evolucionar tu gestión?</h2>
         <p className="text-slate-600 text-lg mb-10 max-w-2xl mx-auto">
           Unite a la comunidad médica más moderna hoy mismo. Es 100% gratis para profesionales de la salud.
@@ -184,7 +181,7 @@ export default function Home() {
       </section>
 
       {/* 7. FOOTER SENCILLO */}
-      <footer className="bg-slate-950 text-slate-400 py-12 px-6 text-center border-t border-slate-900">
+      <footer className="bg-slate-950 text-slate-400 py-12 px-6 text-center border-t border-slate-900 relative z-10">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-blue-500" />
