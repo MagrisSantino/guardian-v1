@@ -24,63 +24,71 @@ export default function Login() {
       if (profile?.role === 'clinic_admin') {
         router.push('/dashboard-clinica')
       } else {
-        // PRECARGA OPTIMISTA PARA MÉDICOS: Bajamos la info antes de que cambie de página
         const [openRes, myRes] = await Promise.all([
           supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('status', 'open').order('date_time', { ascending: true }),
           supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('professional_id', data.user.id).eq('status', 'filled')
         ])
         
-        // Guardamos las fotos en memoria
         if (openRes.data) sessionStorage.setItem('medico_feed_cache', JSON.stringify(openRes.data))
         
         const allCalendarShifts = [...(openRes.data || []), ...(myRes.data || [])]
         sessionStorage.setItem('medico_calendar_cache', JSON.stringify(allCalendarShifts))
 
-        // Ahora sí lo mandamos al tablero
         router.push('/dashboard-medico')
       }
     }
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-md bg-white p-10 rounded-2xl shadow-xl border border-slate-100">
+    <main 
+      className="flex min-h-screen flex-col items-center justify-center p-6 relative overflow-hidden"
+      style={{
+        /* SIN COMILLAS en la url() para evitar el bug de Next.js, y usando la imagen que YA FUNCIONA en tu inicio */
+        backgroundImage: `linear-gradient(to bottom, rgba(248, 250, 252, 0.2), rgba(248, 250, 252, 0.4)), url(https://images.unsplash.com/photo-1516549655169-df83a0774514)`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      {/* EL RECUADRO DE CRISTAL EXACTO AL DEL INICIO */}
+      <div className="relative z-10 w-full max-w-md bg-white/40 backdrop-blur-md p-8 md:p-10 rounded-[2.5rem] border border-white/50 shadow-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Iniciar Sesión</h1>
-          <p className="text-slate-500 text-sm mt-2">Ingresá tus credenciales para acceder</p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 drop-shadow-sm">Iniciar Sesión</h1>
+          <p className="text-slate-800 font-semibold text-sm mt-2 drop-shadow-sm">Ingresá tus credenciales para acceder</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Email</label>
+            <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">Email</label>
             <input 
               type="email" 
               placeholder="Ej: usuario@clinica.com" 
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" 
+              className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-600 shadow-sm" 
               onChange={(e) => setEmail(e.target.value)} 
               required 
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Contraseña</label>
+            <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">Contraseña</label>
             <input 
               type="password" 
               placeholder="••••••••" 
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" 
+              className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-600 shadow-sm" 
               onChange={(e) => setPassword(e.target.value)} 
               required 
             />
           </div>
           
           <div className="pt-2">
-            <button disabled={loading} className="w-full py-3.5 bg-slate-900 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-blue-200 disabled:opacity-70">
+            <button disabled={loading} className="w-full py-3.5 bg-slate-900 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-xl hover:shadow-blue-900/20 disabled:opacity-70">
               {loading ? 'Ingresando...' : 'Ingresar al Sistema'}
             </button>
           </div>
 
-          <p className="text-center text-slate-500 text-sm mt-6">
-            ¿No tenés cuenta? <Link href="/registro" className="text-blue-600 hover:underline font-semibold">Registrate acá</Link>
+          <p className="text-center text-slate-800 font-semibold text-sm mt-6 drop-shadow-sm">
+            ¿No tenés cuenta? <Link href="/registro" className="text-blue-800 hover:text-blue-900 hover:underline font-black">Registrate acá</Link>
           </p>
         </form>
       </div>

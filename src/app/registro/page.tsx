@@ -25,44 +25,69 @@ export default function Registro() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-md bg-white p-10 rounded-2xl shadow-xl border border-slate-100">
+    <main 
+      className="flex min-h-screen flex-col items-center justify-center p-6 relative overflow-hidden"
+      style={{
+        backgroundImage: `linear-gradient(to bottom, rgba(248, 250, 252, 0.2), rgba(248, 250, 252, 0.4)), url(https://images.unsplash.com/photo-1516549655169-df83a0774514)`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      <div className="relative z-10 w-full max-w-md bg-white/40 backdrop-blur-md p-8 md:p-10 rounded-[2.5rem] border border-white/50 shadow-2xl my-8">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Crear Cuenta</h1>
-          <p className="text-slate-500 text-sm mt-2">Seleccioná tu perfil para comenzar</p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 drop-shadow-sm">Crear Cuenta</h1>
+          <p className="text-slate-800 font-semibold text-sm mt-2 drop-shadow-sm">Seleccioná tu perfil para comenzar</p>
         </div>
 
         <form onSubmit={handleSignUp} className="space-y-5">
-          <div className="flex gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
-            <button type="button" onClick={() => setRole('doctor')} className={`flex-1 py-2.5 rounded-lg font-semibold transition-all text-sm ${role === 'doctor' ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>
+          <div className="flex gap-2 bg-white/50 p-1.5 rounded-xl border border-white/60 backdrop-blur-sm shadow-sm">
+            <button type="button" onClick={() => setRole('doctor')} className={`flex-1 py-2.5 rounded-lg font-bold transition-all text-sm ${role === 'doctor' ? 'bg-white text-blue-700 shadow-sm border border-white' : 'text-slate-800 hover:bg-white/50'}`}>
               Soy Médico
             </button>
-            <button type="button" onClick={() => setRole('clinic_admin')} className={`flex-1 py-2.5 rounded-lg font-semibold transition-all text-sm ${role === 'clinic_admin' ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>
+            <button type="button" onClick={() => setRole('clinic_admin')} className={`flex-1 py-2.5 rounded-lg font-bold transition-all text-sm ${role === 'clinic_admin' ? 'bg-white text-blue-700 shadow-sm border border-white' : 'text-slate-800 hover:bg-white/50'}`}>
               Soy Clínica
             </button>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">{role === 'doctor' ? "Nombre Completo" : "Razón Social"}</label>
-            <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" onChange={(e) => setName(e.target.value)} required />
+            <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">{role === 'doctor' ? "Nombre Completo" : "Razón Social"}</label>
+            <input 
+              type="text" 
+              className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-900 shadow-sm" 
+              onChange={(e) => setName(e.target.value)} 
+              required 
+            />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Email</label>
-            <input type="email" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" onChange={(e) => setEmail(e.target.value)} required />
+            <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">Email</label>
+            <input 
+              type="email" 
+              className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-900 shadow-sm" 
+              onChange={(e) => setEmail(e.target.value)} 
+              required 
+            />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Contraseña</label>
-            <input type="password" placeholder="••••••••" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700" onChange={(e) => setPassword(e.target.value)} required />
+            <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">Contraseña</label>
+            <input 
+              type="password" 
+              placeholder="••••••••" 
+              className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-600 shadow-sm" 
+              onChange={(e) => setPassword(e.target.value)} 
+              required 
+            />
           </div>
           
           <div className="pt-2">
-            <button disabled={loading} className="w-full py-3.5 bg-slate-900 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-blue-200 disabled:opacity-70">
+            <button disabled={loading} className="w-full py-3.5 bg-slate-900 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-xl hover:shadow-blue-900/20 disabled:opacity-70">
               {loading ? 'Creando cuenta...' : 'Crear mi cuenta'}
             </button>
           </div>
 
-          <p className="text-center text-slate-500 text-sm mt-6">
-            ¿Ya tenés cuenta? <Link href="/login" className="text-blue-600 hover:underline font-semibold">Iniciá sesión acá</Link>
+          <p className="text-center text-slate-800 font-semibold text-sm mt-6 drop-shadow-sm">
+            ¿Ya tenés cuenta? <Link href="/login" className="text-blue-800 hover:text-blue-900 hover:underline font-black">Iniciá sesión acá</Link>
           </p>
         </form>
       </div>
