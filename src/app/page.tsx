@@ -8,9 +8,12 @@ export default function Home() {
       {/* 1. HERO SECTION (Encabezado principal) */}
       <section className="relative px-6 pt-24 pb-32 md:pt-36 md:pb-40 flex flex-col items-center text-center overflow-hidden">
         
-        {/* --- MAGIA DEL FONDO --- */}
-        {/* Imagen de fondo fotográfica (Hospital moderno/Médicos) */}
-        <div className="absolute inset-0 -z-30 bg-[url('https://images.unsplash.com/photo-1551076805-e18690c5e561?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center bg-fixed opacity-60"></div>
+        {/* --- MAGIA DEL FONDO CORREGIDA --- */}
+        {/* Usamos 'style' para la URL de la imagen y evitamos que Tailwind se confunda con los caracteres especiales */}
+        <div 
+          className="absolute inset-0 -z-30 bg-cover bg-center bg-fixed opacity-60"
+          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1551076805-e18690c5e561?q=80&w=2070&auto=format&fit=crop')" }}
+        ></div>
         
         {/* Capa de desenfoque y brillo (para que el texto negro se lea perfecto) */}
         <div className="absolute inset-0 -z-20 bg-slate-50/70 backdrop-blur-[3px]"></div>
@@ -79,7 +82,6 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Card 1 */}
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow group">
             <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <Zap className="w-6 h-6" />
@@ -87,7 +89,6 @@ export default function Home() {
             <h3 className="text-xl font-bold text-slate-900 mb-3">Conexión Instantánea</h3>
             <p className="text-slate-600 leading-relaxed">Olvidate de los grupos de WhatsApp desorganizados. Postulate a guardias o encontrá médicos con un solo clic.</p>
           </div>
-          {/* Card 2 */}
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow group">
             <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <ShieldCheck className="w-6 h-6" />
@@ -95,7 +96,6 @@ export default function Home() {
             <h3 className="text-xl font-bold text-slate-900 mb-3">Perfiles Verificados</h3>
             <p className="text-slate-600 leading-relaxed">Validamos las matrículas (MP/MN) de todos los profesionales para garantizar la máxima seguridad legal a las instituciones.</p>
           </div>
-          {/* Card 3 */}
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow group">
             <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <Star className="w-6 h-6" />
@@ -103,7 +103,6 @@ export default function Home() {
             <h3 className="text-xl font-bold text-slate-900 mb-3">Ecosistema de Confianza</h3>
             <p className="text-slate-600 leading-relaxed">El primer sistema de reputación bidireccional. Médicos y clínicas se califican mutuamente tras cada guardia finalizada.</p>
           </div>
-          {/* Card 4 */}
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow group">
             <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <CalendarDays className="w-6 h-6" />
@@ -111,7 +110,6 @@ export default function Home() {
             <h3 className="text-xl font-bold text-slate-900 mb-3">Agenda Inteligente</h3>
             <p className="text-slate-600 leading-relaxed">Visualizá tus guardias disponibles, postulaciones pendientes y turnos confirmados en un calendario codificado por colores.</p>
           </div>
-          {/* Card 5 */}
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow group">
             <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <Clock className="w-6 h-6" />
@@ -119,7 +117,6 @@ export default function Home() {
             <h3 className="text-xl font-bold text-slate-900 mb-3">Alertas en Tiempo Real</h3>
             <p className="text-slate-600 leading-relaxed">Recibí notificaciones directas cuando te asignan una guardia, hay una vacante urgente o si alguien cancela a último momento.</p>
           </div>
-          {/* Card 6 */}
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow group">
             <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <UserCheck className="w-6 h-6" />
@@ -139,7 +136,6 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-            {/* Línea conectora (solo visible en desktop) */}
             <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-0.5 bg-slate-800 -z-0"></div>
 
             <div className="relative z-10 flex flex-col items-center text-center">
