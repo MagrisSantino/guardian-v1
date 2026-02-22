@@ -7,10 +7,22 @@ export default function Home() {
       
       {/* 1. HERO SECTION (Encabezado principal) */}
       <section className="relative px-6 pt-24 pb-32 md:pt-36 md:pb-40 flex flex-col items-center text-center overflow-hidden">
-        {/* Fondo decorativo sutil */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-blue-500/10 rounded-full blur-3xl -z-10"></div>
         
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold uppercase tracking-wider mb-8">
+        {/* --- MAGIA DEL FONDO --- */}
+        {/* Imagen de fondo fotográfica (Hospital moderno/Médicos) */}
+        <div className="absolute inset-0 -z-30 bg-[url('https://images.unsplash.com/photo-1551076805-e18690c5e561?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center bg-fixed opacity-60"></div>
+        
+        {/* Capa de desenfoque y brillo (para que el texto negro se lea perfecto) */}
+        <div className="absolute inset-0 -z-20 bg-slate-50/70 backdrop-blur-[3px]"></div>
+        
+        {/* Degradado para que se fusione perfectamente con la sección de abajo */}
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-slate-50/60 to-slate-50"></div>
+        
+        {/* Tu fondo decorativo azul sutil */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-blue-500/20 rounded-full blur-3xl -z-10"></div>
+        {/* ----------------------- */}
+
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 border border-blue-200 text-blue-700 text-xs font-bold uppercase tracking-wider mb-8 shadow-sm backdrop-blur-md">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
@@ -18,11 +30,11 @@ export default function Home() {
           La Red Médica #1 de Córdoba
         </div>
         
-        <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900 max-w-4xl leading-[1.1]">
+        <h1 className="text-5xl md:text-7xl font-black tracking-tight text-slate-900 max-w-4xl leading-[1.1] drop-shadow-sm">
           Conectamos talento médico con <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-400">oportunidades reales</span>
         </h1>
         
-        <p className="mt-8 text-lg md:text-xl text-slate-600 max-w-2xl leading-relaxed font-medium">
+        <p className="mt-8 text-lg md:text-xl text-slate-700 max-w-2xl leading-relaxed font-semibold drop-shadow-sm">
           Guardian es el ecosistema inteligente que simplifica la cobertura de guardias. Sin intermediarios, sin demoras y con un sistema de reputación que premia la excelencia.
         </p>
         
@@ -31,14 +43,14 @@ export default function Home() {
             Crear mi Cuenta Libre
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
-          <Link href="/login" className="px-8 py-4 bg-white border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 rounded-xl font-bold transition-all text-center shadow-sm">
+          <Link href="/login" className="px-8 py-4 bg-white/90 backdrop-blur-sm border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-white rounded-xl font-bold transition-all text-center shadow-sm">
             Iniciar Sesión
           </Link>
         </div>
       </section>
 
       {/* 2. ESTADÍSTICAS RÁPIDAS (Banda de confianza) */}
-      <section className="border-y border-slate-200 bg-white">
+      <section className="border-y border-slate-200 bg-white relative z-10">
         <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-2 md:grid-cols-4 gap-8 divide-x divide-slate-100">
           <div className="text-center px-4">
             <p className="text-4xl font-black text-slate-900">0%</p>
