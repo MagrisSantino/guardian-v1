@@ -9,22 +9,27 @@ const inter = Inter({
   display: "swap",
 });
 
-// Agregamos la configuración para la App Móvil
 export const viewport: Viewport = {
-  themeColor: "#0f172a", // Color de la barra superior del celular
+  themeColor: "#0f172a",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1, // Evita que el celular haga zoom al tocar inputs
+  maximumScale: 1,
+  userScalable: false, // Evita zoom accidental en inputs en celular
 };
 
 export const metadata: Metadata = {
-  title: "Guardian - Gestión de Salud",
+  title: "Guardian - Red Médica",
   description: "Ecosistema profesional para médicos y clínicas en Córdoba",
-  manifest: "/manifest.json", // Archivo que le dice al celu cómo instalar la app
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Guardian",
+  },
+  // ACÁ AGREGAMOS EL ÍCONO PARA APPLE
+  icons: {
+    icon: "/icon-512.png",
+    apple: "/icon-512.png",
   },
   formatDetection: {
     telephone: false,
@@ -37,8 +42,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
-      <body className={`${inter.variable} font-sans antialiased bg-slate-950`}>
+    <html lang="es" className="scroll-smooth">
+      <body className={`${inter.variable} font-sans antialiased bg-slate-50 selection:bg-blue-200`}>
         <Navbar />
         {children}
       </body>

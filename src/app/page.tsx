@@ -7,13 +7,10 @@ export default function Home() {
       
       {/* 1. HERO SECTION (Encabezado principal) */}
       <section 
-        className="relative px-4 sm:px-6 pt-16 sm:pt-24 pb-24 md:pt-36 md:pb-40 flex flex-col items-center text-center overflow-hidden"
+        /* ACÁ ESTÁ EL FIX: Pasamos las propiedades a clases de Tailwind y usamos bg-scroll en móviles y md:bg-fixed en PC */
+        className="relative px-4 sm:px-6 pt-16 sm:pt-24 pb-24 md:pt-36 md:pb-40 flex flex-col items-center text-center overflow-hidden bg-cover bg-center bg-no-repeat bg-scroll md:bg-fixed"
         style={{
           backgroundImage: `linear-gradient(to bottom, rgba(248, 250, 252, 0.2), rgba(248, 250, 252, 0.4)), url(https://images.unsplash.com/photo-1516549655169-df83a0774514)`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed'
         }}
       >
         {/* EL EFECTO CRISTAL (Ajustado para pantallas chicas) */}
