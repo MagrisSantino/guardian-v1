@@ -138,6 +138,9 @@ export default function Navbar() {
               </>
             ) : (
               <>
+                {role === 'super_admin' && (
+                  <Link href="/super-admin-guardian" className={`font-medium transition-colors ${pathname === '/super-admin-guardian' ? 'text-white' : 'text-slate-400 hover:text-white'}`}>Centro de Mando</Link>
+                )}
                 {role === 'clinic_admin' && (
                   <>
                     <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-all">+ Crear Guardia</button>
@@ -217,6 +220,9 @@ export default function Navbar() {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
+                {role === 'super_admin' && (
+                  <Link href="/super-admin-guardian" className={`px-4 py-3 rounded-lg font-medium ${pathname === '/super-admin-guardian' ? 'bg-slate-800 text-white' : 'text-slate-400'}`}>Centro de Mando</Link>
+                )}
                 {role === 'clinic_admin' && (
                   <>
                     <button onClick={() => { setIsMobileMenuOpen(false); setIsModalOpen(true); }} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-bold shadow-sm mb-2 text-center">+ Crear Guardia</button>

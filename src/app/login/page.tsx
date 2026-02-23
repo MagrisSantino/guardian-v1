@@ -16,12 +16,15 @@ export default function Login() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      alert("Error: " + error.message)
+      alert("Error de acceso: " + error.message)
       setLoading(false)
     } else {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
       
-      if (profile?.role === 'clinic_admin') {
+      // RUTEO PROFESIONAL BASADO EN ROLES
+      if (profile?.role === 'super_admin') {
+        router.push('/super-admin-guardian')
+      } else if (profile?.role === 'clinic_admin') {
         router.push('/dashboard-clinica')
       } else {
         const [openRes, myRes] = await Promise.all([
@@ -30,7 +33,6 @@ export default function Login() {
         ])
         
         if (openRes.data) sessionStorage.setItem('medico_feed_cache', JSON.stringify(openRes.data))
-        
         const allCalendarShifts = [...(openRes.data || []), ...(myRes.data || [])]
         sessionStorage.setItem('medico_calendar_cache', JSON.stringify(allCalendarShifts))
 
@@ -43,7 +45,6 @@ export default function Login() {
     <main 
       className="flex min-h-screen flex-col items-center justify-center p-6 relative overflow-hidden"
       style={{
-        /* SIN COMILLAS en la url() para evitar el bug de Next.js, y usando la imagen que YA FUNCIONA en tu inicio */
         backgroundImage: `linear-gradient(to bottom, rgba(248, 250, 252, 0.2), rgba(248, 250, 252, 0.4)), url(https://images.unsplash.com/photo-1516549655169-df83a0774514)`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
@@ -51,16 +52,15 @@ export default function Login() {
         backgroundAttachment: 'fixed'
       }}
     >
-      {/* EL RECUADRO DE CRISTAL EXACTO AL DEL INICIO */}
       <div className="relative z-10 w-full max-w-md bg-white/40 backdrop-blur-md p-8 md:p-10 rounded-[2.5rem] border border-white/50 shadow-2xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black tracking-tight text-slate-900 drop-shadow-sm">Iniciar Sesión</h1>
-          <p className="text-slate-800 font-semibold text-sm mt-2 drop-shadow-sm">Ingresá tus credenciales para acceder</p>
+          <p className="text-slate-800 font-semibold text-sm mt-2 drop-shadow-sm">Portal de acceso a la red médica</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">Email</label>
+            <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">Email Corporativo</label>
             <input 
               type="email" 
               placeholder="Ej: usuario@clinica.com" 

@@ -8,6 +8,9 @@ export default function Registro() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [dni, setDni] = useState('')
+  const [matricula, setMatricula] = useState('')
+  const [specialty, setSpecialty] = useState('')
   const [role, setRole] = useState<'doctor' | 'clinic_admin'>('doctor')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -15,7 +18,21 @@ export default function Registro() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name, role: role } } })
+    
+    const { error } = await supabase.auth.signUp({ 
+      email, 
+      password, 
+      options: { 
+        data: { 
+          full_name: name, 
+          role: role,
+          dni: role === 'doctor' ? dni : null,
+          matricula: role === 'doctor' ? matricula : null,
+          specialty: role === 'doctor' ? specialty : null
+        } 
+      } 
+    })
+    
     setLoading(false)
     if (error) alert(error.message)
     else {
@@ -41,8 +58,8 @@ export default function Registro() {
           <p className="text-slate-800 font-semibold text-sm mt-2 drop-shadow-sm">Seleccioná tu perfil para comenzar</p>
         </div>
 
-        <form onSubmit={handleSignUp} className="space-y-5">
-          <div className="flex gap-2 bg-white/50 p-1.5 rounded-xl border border-white/60 backdrop-blur-sm shadow-sm">
+        <form onSubmit={handleSignUp} className="space-y-4">
+          <div className="flex gap-2 bg-white/50 p-1.5 rounded-xl border border-white/60 backdrop-blur-sm shadow-sm mb-2">
             <button type="button" onClick={() => setRole('doctor')} className={`flex-1 py-2.5 rounded-lg font-bold transition-all text-sm ${role === 'doctor' ? 'bg-white text-blue-700 shadow-sm border border-white' : 'text-slate-800 hover:bg-white/50'}`}>
               Soy Médico
             </button>
@@ -60,6 +77,44 @@ export default function Registro() {
               required 
             />
           </div>
+
+          {role === 'doctor' && (
+            <>
+              <div>
+                <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">DNI</label>
+                <input 
+                  type="text" 
+                  placeholder="Sin puntos ni espacios"
+                  className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-500 shadow-sm text-sm" 
+                  onChange={(e) => setDni(e.target.value)} 
+                  required 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">Matrícula</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej: MP 1234"
+                    className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-500 shadow-sm text-sm" 
+                    onChange={(e) => setMatricula(e.target.value)} 
+                    required 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">Especialidad</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej: Pediatría"
+                    className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-white/50 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-500 shadow-sm text-sm" 
+                    onChange={(e) => setSpecialty(e.target.value)} 
+                    required 
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
           <div>
             <label className="block text-sm font-bold text-slate-900 mb-1.5 ml-1 drop-shadow-sm">Email</label>
             <input 
@@ -80,7 +135,7 @@ export default function Registro() {
             />
           </div>
           
-          <div className="pt-2">
+          <div className="pt-4">
             <button disabled={loading} className="w-full py-3.5 bg-slate-900 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-xl hover:shadow-blue-900/20 disabled:opacity-70">
               {loading ? 'Creando cuenta...' : 'Crear mi cuenta'}
             </button>
