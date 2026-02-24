@@ -7,6 +7,7 @@ export default function PublicarModal({ onClose, onRefresh }: any) {
   const [title, setTitle] = useState('')
   const [specialty, setSpecialty] = useState('')
   const [dateTime, setDateTime] = useState('')
+  const [durationHours, setDurationHours] = useState('24') // Por defecto ponemos 24hs que es lo más común
   const [price, setPrice] = useState('')
   const [loading, setLoading] = useState(false)
   
@@ -32,11 +33,13 @@ export default function PublicarModal({ onClose, onRefresh }: any) {
 
     const { data: { session } } = await supabase.auth.getSession()
     
+    // ACÁ ESTABA EL ERROR: Faltaba enviar el duration_hours
     const { error } = await supabase.from('shifts').insert([{
       clinic_id: session?.user.id,
       title,
       specialty_required: specialty,
       date_time: dateTime,
+      duration_hours: parseInt(durationHours), // Lo convertimos a número y lo enviamos
       price: parseFloat(price),
       status: 'open'
     }])
@@ -59,7 +62,6 @@ export default function PublicarModal({ onClose, onRefresh }: any) {
     )
   }
 
-  // SI NO ESTÁ VERIFICADA, MOSTRAMOS PANTALLA DE BLOQUEO EN VEZ DEL FORMULARIO
   if (!isVerified) {
     return (
       <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in">
@@ -73,7 +75,6 @@ export default function PublicarModal({ onClose, onRefresh }: any) {
     )
   }
 
-  // SI ESTÁ VERIFICADA, MOSTRAMOS EL FORMULARIO NORMAL
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
       <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-md shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95">
@@ -95,16 +96,23 @@ export default function PublicarModal({ onClose, onRefresh }: any) {
             <label className="block text-sm font-bold text-slate-700 mb-1.5">Especialidad Requerida</label>
             <input type="text" value={specialty} onChange={e => setSpecialty(e.target.value)} required placeholder="Ej: Pediatría" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
           </div>
+          
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Fecha y Hora</label>
-              <input type="datetime-local" value={dateTime} onChange={e => setDateTime(e.target.value)} required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
+              <input type="datetime-local" value={dateTime} onChange={e => setDateTime(e.target.value)} required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900 text-sm" />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">Pago Ofrecido ($)</label>
-              <input type="number" value={price} onChange={e => setPrice(e.target.value)} required min="0" placeholder="Ej: 150000" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">Duración (Horas)</label>
+              <input type="number" value={durationHours} onChange={e => setDurationHours(e.target.value)} required min="1" placeholder="Ej: 24" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
             </div>
           </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">Pago Ofrecido ($)</label>
+            <input type="number" value={price} onChange={e => setPrice(e.target.value)} required min="0" placeholder="Ej: 150000" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
+          </div>
+          
           <button type="submit" disabled={loading} className="w-full mt-4 bg-slate-900 hover:bg-blue-700 text-white py-4 rounded-xl font-black transition-all shadow-xl hover:shadow-blue-900/20 hover:-translate-y-0.5">
             {loading ? 'Publicando...' : 'Publicar Guardia'}
           </button>
