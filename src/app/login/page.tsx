@@ -21,11 +21,10 @@ export default function Login() {
     } else {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
       
-      // RUTEO PROFESIONAL BASADO EN ROLES
       if (profile?.role === 'super_admin') {
-        router.push('/super-admin-guardian')
+        window.location.href = '/super-admin-guardian'
       } else if (profile?.role === 'clinic_admin') {
-        router.push('/dashboard-clinica')
+        window.location.href = '/dashboard-clinica'
       } else {
         const [openRes, myRes] = await Promise.all([
           supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('status', 'open').order('date_time', { ascending: true }),
@@ -36,7 +35,7 @@ export default function Login() {
         const allCalendarShifts = [...(openRes.data || []), ...(myRes.data || [])]
         sessionStorage.setItem('medico_calendar_cache', JSON.stringify(allCalendarShifts))
 
-        router.push('/dashboard-medico')
+        window.location.href = '/dashboard-medico'
       }
     }
   }

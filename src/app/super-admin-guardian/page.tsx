@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ShieldAlert, BadgeCheck, AlertCircle, Building2, UserCircle, LogOut } from 'lucide-react'
+import { ShieldAlert, BadgeCheck, AlertCircle, Building2, UserCircle } from 'lucide-react'
 
 export default function SuperAdminDashboard() {
   const [users, setUsers] = useState<any[]>([])
@@ -11,19 +11,16 @@ export default function SuperAdminDashboard() {
   const [activeTab, setActiveTab] = useState<'doctor' | 'clinic_admin'>('doctor')
   const router = useRouter()
 
-  // Carga inicial
   useEffect(() => {
     checkSecurityAndFetch(true, activeTab)
   }, [])
 
-  // Carga al cambiar de pestaña (silenciosa)
   useEffect(() => {
     if (!initialLoading) {
       checkSecurityAndFetch(false, activeTab)
     }
   }, [activeTab])
 
-  // Le pasamos el 'tab' por parámetro para evitar cruce de datos en React
   async function checkSecurityAndFetch(isInitial: boolean, tab: string) {
     if (isInitial) setInitialLoading(true)
     else setFetchingData(true)
@@ -48,30 +45,21 @@ export default function SuperAdminDashboard() {
   }
 
   async function toggleVerification(id: string, currentStatus: boolean) {
-    // 1. ACTUALIZACIÓN OPTIMISTA (La magia para que sea instantáneo)
-    // Cambiamos el estado en la pantalla antes de que Supabase responda
     setUsers(currentUsers => 
       currentUsers.map(user => 
         user.id === id ? { ...user, is_verified: !currentStatus } : user
       ).sort((a, b) => (a.is_verified === b.is_verified) ? 0 : a.is_verified ? 1 : -1)
     );
 
-    // 2. Ejecución real en la base de datos (silenciosa)
     const { error } = await supabase
       .from('profiles')
       .update({ is_verified: !currentStatus })
       .eq('id', id)
       
-    // 3. Si hay un error de internet, revertimos el cambio visual
     if (error) {
       alert('Error de conexión al servidor: ' + error.message)
       checkSecurityAndFetch(false, activeTab) 
     }
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.replace('/')
   }
 
   if (initialLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-950"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-blue-500"></div></div>
@@ -81,19 +69,14 @@ export default function SuperAdminDashboard() {
       <div className="max-w-7xl mx-auto">
         
         {/* Cabecera del Centro de Mando */}
-        <div className="bg-slate-950 text-white rounded-3xl p-6 sm:p-10 mb-8 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.4)]">
-              <ShieldAlert className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">Centro de Mando</h1>
-              <p className="text-slate-400 font-medium mt-1">Nivel de Acceso: Super Admin</p>
-            </div>
+        <div className="bg-slate-950 text-white rounded-3xl p-6 sm:p-10 mb-8 shadow-2xl flex items-center gap-5">
+          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.4)]">
+            <ShieldAlert className="w-8 h-8 text-white" />
           </div>
-          <button onClick={handleLogout} className="flex items-center gap-2 bg-slate-800 hover:bg-red-600 px-6 py-3 rounded-xl font-bold transition-colors">
-            <LogOut className="w-5 h-5" /> Salir
-          </button>
+          <div>
+            <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">Centro de Mando</h1>
+            <p className="text-slate-400 font-medium mt-1">Nivel de Acceso: Super Admin</p>
+          </div>
         </div>
 
         {/* Pestañas (Tabs) */}
