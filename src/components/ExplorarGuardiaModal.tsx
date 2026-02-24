@@ -2,123 +2,88 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { AlertCircle } from 'lucide-react'
 
-export default function ExplorarGuardiaModal({ onClose, shift, hasApplied, onApply, onWithdraw, loadingBtn }: any) {
-  const [reviews, setReviews] = useState<any[]>([])
-  const [loadingReviews, setLoadingReviews] = useState(true)
-  
-  const clinic = shift.clinic;
-  const ratingDisplay = clinic?.reviews_count > 0 ? Number(clinic.rating).toFixed(2) : 'Nueva';
+export default function ExplorarGuardiaModal({ shift, onClose, onRefresh }: any) {
+  const [loading, setLoading] = useState(false)
+  const [isVerified, setIsVerified] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
 
   useEffect(() => {
-    fetchReviews()
+    async function checkVerification() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        const { data } = await supabase.from('profiles').select('is_verified').eq('id', session.user.id).single()
+        setIsVerified(data?.is_verified === true)
+      }
+      setCheckingAuth(false)
+    }
+    checkVerification()
   }, [])
 
-  async function fetchReviews() {
-    const { data } = await supabase
-      .from('reviews')
-      .select('rating, comment, created_at, doctor:profiles!reviewer_id(full_name)')
-      .eq('reviewed_id', shift.clinic_id)
-      .order('created_at', { ascending: false })
-      .limit(5)
+  async function handleApply() {
+    if (!isVerified) return; // Doble barrera de seguridad
+    setLoading(true)
+    const { data: { session } } = await supabase.auth.getSession()
     
-    if (data) setReviews(data)
-    setLoadingReviews(false)
+    await supabase.from('shift_applications').insert([{ 
+      shift_id: shift.id, 
+      professional_id: session?.user.id, 
+      status: 'pending' 
+    }])
+    
+    const targetClinicId = shift.clinic_id || shift.clinic?.id;
+    if (targetClinicId) {
+      await supabase.from('notifications').insert([{
+        user_id: targetClinicId,
+        shift_id: shift.id,
+        title: '¡Nueva Postulación! 👨‍⚕️',
+        message: `Un profesional se acaba de postular a tu guardia: ${shift.title}.`
+      }])
+    }
+
+    alert('¡Postulación enviada exitosamente!')
+    onRefresh()
+    onClose()
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white border border-slate-200 p-6 md:p-8 rounded-2xl w-full max-w-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
+      <div className="bg-white border border-slate-200 p-6 md:p-8 rounded-3xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-blue-400"></div>
         
-        {/* Info de la Clínica y Reputación */}
-        <div className="flex items-center gap-4 mb-6">
-           <div className="h-16 w-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl border border-blue-100 shadow-sm shrink-0">
-             🏥
-           </div>
-           <div>
-              <h2 className="text-2xl font-bold text-slate-900">{clinic?.full_name || 'Clínica Confidencial'}</h2>
-              <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800 mt-1">
-                <span className="text-amber-400 text-lg leading-none">★</span>
-                <span>{ratingDisplay}</span>
-                <span className="text-xs text-slate-400 font-medium">({clinic?.reviews_count || 0} reseñas)</span>
-              </div>
-           </div>
-        </div>
-
-        {/* Detalles Técnicos de la Oferta */}
-        <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4 mb-6 shadow-inner">
-           <div className="flex justify-between items-start">
-             <div>
-               <h3 className="text-lg font-bold text-slate-800">{shift.title}</h3>
-               <span className="text-xs font-bold bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded mt-1 inline-block uppercase tracking-wider">{shift.specialty_required}</span>
-             </div>
-             <p className="text-emerald-600 font-bold text-xl">${shift.price.toLocaleString()}</p>
-           </div>
-           
-           <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/60">
-             <div>
-               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Fecha y Hora</p>
-               <p className="font-semibold text-slate-900">{format(new Date(shift.date_time), 'dd/MM/yyyy HH:mm')}hs</p>
-             </div>
-             <div>
-               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Duración</p>
-               <p className="font-semibold text-slate-900">{shift.duration_hours} horas</p>
-             </div>
-             <div className="col-span-2">
-               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ubicación</p>
-               <p className="font-semibold text-slate-900">{shift.location || 'Córdoba Capital'}</p>
-             </div>
-           </div>
-        </div>
-
-        {/* Reseñas Reales */}
-        <div className="mb-6">
-          <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-            Reseñas de otros médicos
-          </h3>
-          <div className="space-y-3 min-h-[50px] max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
-            {loadingReviews ? (
-              <p className="text-xs text-slate-500 text-center py-4">Cargando comentarios...</p>
-            ) : reviews.length === 0 ? (
-              <p className="text-xs text-slate-500 text-center py-4 italic bg-slate-50 rounded-lg border border-slate-100">Esta clínica aún no tiene reseñas.</p>
-            ) : (
-              reviews.map((review, idx) => (
-                <div key={idx} className="bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="text-xs font-bold text-slate-700">{review.doctor?.full_name || 'Médico Anónimo'}</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-amber-400 text-xs">★</span>
-                      <span className="text-xs font-bold text-slate-800">{review.rating}</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-900 mb-2 leading-relaxed">"{review.comment || 'Sin comentario.'}"</p>
-                  <p className="text-[9px] text-slate-400 font-medium uppercase tracking-wider">
-                    {format(new Date(review.created_at), 'MMM yyyy', { locale: es })}
-                  </p>
-                </div>
-              ))
-            )}
+        <div className="mb-6 pb-6 border-b border-slate-100">
+          <div className="flex items-center gap-4 mb-3">
+            <div className="h-14 w-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-3xl border border-blue-100 shadow-sm">🏥</div>
+            <div>
+              <h2 className="text-xl font-black text-slate-900 leading-tight">{shift.clinic?.full_name || 'Clínica'}</h2>
+              <span className="inline-block mt-1 text-[10px] font-black bg-slate-100 text-slate-600 px-2 py-0.5 rounded uppercase tracking-widest">{shift.specialty_required}</span>
+            </div>
+          </div>
+          <h3 className="text-lg font-bold text-slate-800 mt-5 leading-snug">{shift.title}</h3>
+          <div className="flex items-center justify-between mt-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <p className="text-slate-700 font-bold text-sm flex items-center gap-2">
+              <span className="text-lg">📅</span> {format(new Date(shift.date_time), 'dd/MM/yyyy HH:mm')}hs
+            </p>
+            <p className="text-emerald-600 font-black text-xl">${(shift.price / 1000)}k</p>
           </div>
         </div>
 
-        {/* Acciones */}
-        <div className="flex gap-3">
-          <button onClick={onClose} className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-6 py-3 rounded-xl font-bold transition-all shadow-sm">
-            Cerrar
+        {checkingAuth ? (
+          <div className="py-4 text-center text-slate-500 font-bold animate-pulse">Verificando credenciales...</div>
+        ) : isVerified ? (
+          <button onClick={handleApply} disabled={loading} className="w-full bg-slate-900 hover:bg-blue-700 text-white py-4 rounded-xl font-black text-lg transition-all shadow-xl hover:shadow-blue-900/20 hover:-translate-y-0.5">
+            {loading ? 'Procesando...' : 'Postularme a esta Guardia'}
           </button>
-          
-          {hasApplied ? (
-            <button onClick={() => { onWithdraw(shift.id); onClose(); }} disabled={loadingBtn === shift.id} className="flex-1 bg-orange-50 hover:bg-red-50 border border-orange-200 hover:border-red-200 text-orange-700 hover:text-red-600 rounded-xl font-bold shadow-sm transition-all">
-              {loadingBtn === shift.id ? '...' : 'Postulado ✓ (Retirar)'}
-            </button>
-          ) : (
-            <button onClick={() => { onApply(shift.id); onClose(); }} disabled={loadingBtn === shift.id} className="flex-1 bg-slate-900 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 text-white rounded-xl font-bold shadow-md transition-all">
-              {loadingBtn === shift.id ? 'Enviando...' : 'Postularme'}
-            </button>
-          )}
-        </div>
+        ) : (
+          <div className="bg-red-50 border-2 border-red-100 rounded-xl p-4 text-center">
+            <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+            <p className="text-red-700 font-bold text-sm leading-tight">Acción Bloqueada</p>
+            <p className="text-red-600/80 text-xs font-semibold mt-1">Tu identidad médica aún no ha sido validada por Guardian. Completá tu perfil para poder postularte.</p>
+          </div>
+        )}
 
+        <button onClick={onClose} className="w-full mt-4 text-slate-400 hover:text-slate-700 font-black text-sm py-2 transition-colors uppercase tracking-widest">Cerrar Ventana</button>
       </div>
     </div>
   )
