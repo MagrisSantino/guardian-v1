@@ -36,12 +36,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Si YA tiene sesión e intenta ir al login o registro, lo mandamos a su panel
-  if (session && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/registro')) {
-    // Nota: Como el middleware es rápido, lo mandamos al index o a un validador si no sabemos su rol
-    return NextResponse.redirect(new URL('/', request.url)) 
-  }
-
+  // Dejamos que /login y /registro siempre sean accesibles (la propia página redirige si ya hay sesión)
   return response
 }
 

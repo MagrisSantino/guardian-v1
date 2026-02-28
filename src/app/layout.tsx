@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import AppNavbarWrapper from "@/components/AppNavbarWrapper";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#0f172a",
+  themeColor: "#1a1f4b",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -18,15 +18,15 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Guardian - Red Médica",
-  description: "Ecosistema profesional para médicos y clínicas en Córdoba",
+  title: "Guardian - Plataforma de Guardias Médicas",
+  description:
+    "Conectamos talento médico con oportunidades reales. El ecosistema inteligente que simplifica la cobertura de guardias sin intermediarios.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Guardian",
   },
-  // ACÁ AGREGAMOS EL ÍCONO PARA APPLE
   icons: {
     icon: "/icon-512.png",
     apple: "/icon-512.png",
@@ -43,8 +43,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="scroll-smooth">
-      <body className={`${inter.variable} font-sans antialiased bg-slate-50 selection:bg-blue-200`}>
-        <Navbar />
+      <body className={`${inter.variable} font-sans antialiased bg-background text-foreground selection:bg-primary/20`}>
+        <AppNavbarWrapper />
         {children}
       </body>
     </html>
