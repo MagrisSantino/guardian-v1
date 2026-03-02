@@ -41,9 +41,10 @@ export default function DashboardMedico() {
     return []
   })
 
-  function checkOverlap(shiftDate: Date, durationHours: number): boolean {
+  function checkOverlap(shiftDate: Date, durationHours: number, excludeShiftId?: string): boolean {
     const shiftEnd = addHours(shiftDate, durationHours)
     for (const c of myConfirmedShifts) {
+      if (excludeShiftId && c.id === excludeShiftId) continue
       const confStart = parseISO(c.date_time)
       const confEnd = addHours(confStart, c.duration_hours ?? 0)
       const marginStart = subHours(confStart, 12)
@@ -217,7 +218,7 @@ export default function DashboardMedico() {
             {sortedShifts.map(shift => {
                const shiftDate = parseISO(shift.date_time)
                const hasApplied = myApplications.includes(shift.id)
-               const hasOverlap = checkOverlap(shiftDate, Number(shift.duration_hours) || 0)
+               const hasOverlap = shift.status === 'open' && checkOverlap(shiftDate, Number(shift.duration_hours) || 0, shift.id)
                const kmCba = shift.clinic?.km_from_cordoba ?? shift.clinic?.km_from_cba
                const category = shift.shift_category || 'Guardia'
 
@@ -271,7 +272,7 @@ export default function DashboardMedico() {
         <ExplorarGuardiaModal 
           shift={selectedShift}
           hasApplied={myApplications.includes(selectedShift.id)}
-          hasOverlap={checkOverlap(parseISO(selectedShift.date_time), Number(selectedShift.duration_hours) || 0)}
+          hasOverlap={selectedShift.status === 'open' && checkOverlap(parseISO(selectedShift.date_time), Number(selectedShift.duration_hours) || 0, selectedShift.id)}
           onClose={() => setSelectedShift(null)}
           onApply={handleApply}
           onWithdraw={handleCancelApplication}

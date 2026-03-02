@@ -291,9 +291,10 @@ function CalendarioMedicoContent() {
     return []
   })
 
-  function checkOverlap(shiftDate: Date, durationHours: number): boolean {
+  function checkOverlap(shiftDate: Date, durationHours: number, excludeShiftId?: string): boolean {
     const shiftEnd = addHours(shiftDate, durationHours)
     for (const c of myConfirmedShifts) {
+      if (excludeShiftId && c.id === excludeShiftId) continue
       const confStart = parseISO(c.date_time)
       const confEnd = addHours(confStart, c.duration_hours ?? 0)
       const marginStart = subHours(confStart, 12)
@@ -667,7 +668,7 @@ function CalendarioMedicoContent() {
                               shift={g}
                               getUserStatus={getUserStatus}
                               onShiftClick={handleShiftClick}
-                              hasOverlap={checkOverlap(parseISO(g.date_time), Number(g.duration_hours) || 0)}
+                              hasOverlap={getUserStatus(g) === 'disponible' && checkOverlap(parseISO(g.date_time), Number(g.duration_hours) || 0, g.id)}
                             />
                           ))}
                         </div>
@@ -729,7 +730,7 @@ function CalendarioMedicoContent() {
                             shift={shift}
                             getUserStatus={getUserStatus}
                             onShiftClick={handleShiftClick}
-                            hasOverlap={checkOverlap(parseISO(shift.date_time), Number(shift.duration_hours) || 0)}
+                            hasOverlap={getUserStatus(shift) === 'disponible' && checkOverlap(parseISO(shift.date_time), Number(shift.duration_hours) || 0, shift.id)}
                           />
                         ))}
                       </div>
@@ -746,7 +747,7 @@ function CalendarioMedicoContent() {
         <DetalleGuardiaMedicoModal
           shift={selectedShift}
           userStatus={selectedUserStatus}
-          hasOverlap={checkOverlap(parseISO(selectedShift.date_time), Number(selectedShift.duration_hours) || 0)}
+          hasOverlap={selectedUserStatus === 'disponible' && checkOverlap(parseISO(selectedShift.date_time), Number(selectedShift.duration_hours) || 0, selectedShift.id)}
           onClose={() => setSelectedShift(null)}
           onRefresh={fetchData}
         />
