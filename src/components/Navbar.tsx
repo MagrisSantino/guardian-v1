@@ -4,12 +4,13 @@ import { supabase } from '@/lib/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import PublicarModal from './PublicarModal'
-import { LogOut, Bell, Shield, Menu, X, LayoutDashboard, Calendar, User, Plus } from 'lucide-react'
+import { LogOut, Bell, Shield, Menu, X, LayoutDashboard, Calendar, CalendarCheck, User, Plus } from 'lucide-react'
 
 export default function Navbar() {
   const [user, setUser] = useState<any>(null)
   const [role, setRole] = useState<string | null>(null)
   const [profileName, setProfileName] = useState<string | null>(null)
+  const [isVerified, setIsVerified] = useState<boolean | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -34,9 +35,10 @@ export default function Navbar() {
       const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user || null)
       if (session?.user) {
-        const { data } = await supabase.from('profiles').select('role, full_name').eq('id', session.user.id).single()
+        const { data } = await supabase.from('profiles').select('role, full_name, is_verified').eq('id', session.user.id).single()
         setRole(data?.role ?? null)
         setProfileName(data?.full_name ?? null)
+        setIsVerified(data?.is_verified ?? null)
         fetchNotifications(session.user.id)
       }
     }
@@ -45,14 +47,16 @@ export default function Navbar() {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null)
       if (session?.user) {
-        supabase.from('profiles').select('role, full_name').eq('id', session.user.id).single().then(({ data }) => {
+        supabase.from('profiles').select('role, full_name, is_verified').eq('id', session.user.id).single().then(({ data }) => {
           setRole(data?.role ?? null)
           setProfileName(data?.full_name ?? null)
+          setIsVerified(data?.is_verified ?? null)
         })
         fetchNotifications(session.user.id)
       } else {
         setRole(null)
         setProfileName(null)
+        setIsVerified(null)
         setNotifications([])
       }
     })
@@ -179,10 +183,17 @@ export default function Navbar() {
                   </Link>
                   <Link
                     href="/calendario-medico"
-                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname === '/calendario-medico' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname === '/calendario-medico' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
                   >
                     <Calendar className="h-4 w-4" />
                     Calendario
+                  </Link>
+                  <Link
+                    href="/mis-guardias"
+                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname === '/mis-guardias' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+                  >
+                    <CalendarCheck className="h-4 w-4" />
+                    Mis guardias
                   </Link>
                 </>
               )}
@@ -263,10 +274,13 @@ export default function Navbar() {
                       <Link
                         href="/perfil"
                         onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        className="relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                       >
                         <User className="h-4 w-4" />
                         Mi Perfil
+                        {isVerified === false && (
+                          <span className="absolute -top-1 -right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-hidden />
+                        )}
                       </Link>
                       <div className="my-1 h-px bg-slate-100" />
                       <button
@@ -344,15 +358,22 @@ export default function Navbar() {
                           <LayoutDashboard className="h-4 w-4" />
                           Panel
                         </Link>
-                        <Link href="/calendario-medico" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/calendario-medico' ? 'bg-blue-50 font-medium text-blue-700' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
+                        <Link href="/calendario-medico" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/calendario-medico' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
                           <Calendar className="h-4 w-4" />
                           Calendario
                         </Link>
+                        <Link href="/mis-guardias" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/mis-guardias' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
+                          <CalendarCheck className="h-4 w-4" />
+                          Mis guardias
+                        </Link>
                       </>
                     )}
-                    <Link href="/perfil" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/perfil' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
+                    <Link href="/perfil" className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/perfil' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
                       <User className="h-4 w-4" />
                       Mi Perfil
+                      {isVerified === false && (
+                        <span className="absolute -top-1 -right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-hidden />
+                      )}
                     </Link>
                   </nav>
                   <div className="my-3 border-t border-slate-200" />

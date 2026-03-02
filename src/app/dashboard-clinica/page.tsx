@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import PublicarModal from '@/components/PublicarModal'
 import VerPostulantesModal from '@/components/VerPostulantesModal'
 import CalificarMedicoModal from '@/components/CalificarMedicoModal'
+import VerGuardiaAsignadaModal from '@/components/VerGuardiaAsignadaModal'
 import {
   format,
   addMonths,
@@ -267,6 +268,7 @@ function DashboardClinicaContent() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [isPublicarOpen, setIsPublicarOpen] = useState(false)
   const [isPostulantesOpen, setIsPostulantesOpen] = useState(false)
+  const [isVerGuardiaAsignadaOpen, setIsVerGuardiaAsignadaOpen] = useState(false)
   const [isCalificarOpen, setIsCalificarOpen] = useState(false)
   const [selectedDateForModal, setSelectedDateForModal] = useState<Date | null>(null)
   const [shiftToManage, setShiftToManage] = useState<any>(null)
@@ -307,9 +309,10 @@ function DashboardClinicaContent() {
             if (shift) {
               setShiftToManage(shift)
               setIsPostulantesOpen(false)
+              setIsVerGuardiaAsignadaOpen(false)
               setIsCalificarOpen(false)
               if (shift.status === 'open') setIsPostulantesOpen(true)
-              else if (shift.status === 'filled') setIsCalificarOpen(true)
+              else if (shift.status === 'filled') setIsVerGuardiaAsignadaOpen(true)
               else if (shift.status === 'completed') alert('Esta guardia ya fue completada y el profesional fue calificado.')
               router.replace(pathname, { scroll: false })
             }
@@ -327,9 +330,10 @@ function DashboardClinicaContent() {
     e.stopPropagation()
     setShiftToManage(shift)
     setIsPostulantesOpen(false)
+    setIsVerGuardiaAsignadaOpen(false)
     setIsCalificarOpen(false)
     if (shift.status === 'open') setIsPostulantesOpen(true)
-    else if (shift.status === 'filled') setIsCalificarOpen(true)
+    else if (shift.status === 'filled') setIsVerGuardiaAsignadaOpen(true)
     else if (shift.status === 'completed') alert('Esta guardia ya fue completada y el profesional fue calificado.')
   }
 
@@ -705,6 +709,17 @@ function DashboardClinicaContent() {
           onClose={() => setIsPostulantesOpen(false)}
           onRefresh={fetchMyShifts}
           shift={shiftToManage}
+        />
+      )}
+      {isVerGuardiaAsignadaOpen && shiftToManage && (
+        <VerGuardiaAsignadaModal
+          onClose={() => setIsVerGuardiaAsignadaOpen(false)}
+          onRefresh={fetchMyShifts}
+          shift={shiftToManage}
+          onFinalize={() => {
+            setIsVerGuardiaAsignadaOpen(false)
+            setIsCalificarOpen(true)
+          }}
         />
       )}
       {isCalificarOpen && (

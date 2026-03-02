@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { MessageCircle } from 'lucide-react'
 
 export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) {
   const [applications, setApplications] = useState<any[]>([])
@@ -29,7 +30,7 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
       .from('shift_applications')
       .select('*, professional:profiles!professional_id(*)')
       .eq('shift_id', shift.id)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'accepted'])
     
     if (data) setApplications(data)
     setLoading(false)
@@ -157,12 +158,32 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
               </div>
             </div>
 
-            <button 
-              onClick={() => handleAccept(selectedApp.id, selectedApp.professional_id)} 
-              className="w-full bg-slate-900 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold shadow-md hover:shadow-blue-900/20 transition-all text-base"
-            >
-               Asignar Guardia a {selectedApp.professional.full_name?.split(' ')[0] || 'este médico'}
-            </button>
+            {selectedApp.status === 'accepted' ? (
+              (() => {
+                const whatsapp = selectedApp.professional?.whatsapp || selectedApp.professional?.phone
+                const waNumber = whatsapp ? whatsapp.replace(/\D/g, '') : null
+                return waNumber ? (
+                  <a
+                    href={`https://wa.me/${waNumber}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 w-full bg-[#25D366] hover:bg-[#20bd5a] text-white py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all text-base"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    Contactar a este Médico
+                  </a>
+                ) : (
+                  <p className="text-center text-sm text-slate-500 py-2">Este médico no tiene WhatsApp cargado.</p>
+                )
+              })()
+            ) : (
+              <button 
+                onClick={() => handleAccept(selectedApp.id, selectedApp.professional_id)} 
+                className="w-full bg-slate-900 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold shadow-md hover:shadow-blue-900/20 transition-all text-base"
+              >
+                 Asignar Guardia a {selectedApp.professional.full_name?.split(' ')[0] || 'este médico'}
+              </button>
+            )}
           </div>
         ) : (
           
@@ -186,6 +207,8 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
                 applications.map(app => {
                   const prof = app.professional;
                   const ratingDisplay = prof.reviews_count > 0 ? Number(prof.rating).toFixed(2) : 'Nuevo';
+                  const isAccepted = app.status === 'accepted';
+                  const waNumber = (prof?.whatsapp || prof?.phone)?.replace(/\D/g, '');
 
                   return (
                     <div 
@@ -199,6 +222,9 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
                           {prof.is_verified && (
                             <span className="bg-blue-600 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full" title="Verificado">✓</span>
                           )}
+                          {isAccepted && (
+                            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Asignado</span>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
@@ -210,12 +236,25 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
                         </div>
                       </div>
 
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleAccept(app.id, app.professional_id); }}
-                        className="w-full sm:w-auto bg-white border border-slate-300 hover:bg-slate-900 hover:text-white hover:border-slate-900 text-slate-700 px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-all"
-                      >
-                        Asignar
-                      </button>
+                      {isAccepted && waNumber ? (
+                        <a
+                          href={`https://wa.me/${waNumber}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 w-full sm:w-auto justify-center bg-[#25D366] hover:bg-[#20bd5a] text-white px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-all"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          Contactar
+                        </a>
+                      ) : !isAccepted ? (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleAccept(app.id, app.professional_id); }}
+                          className="w-full sm:w-auto bg-white border border-slate-300 hover:bg-slate-900 hover:text-white hover:border-slate-900 text-slate-700 px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-all"
+                        >
+                          Asignar
+                        </button>
+                      ) : null}
                     </div>
                   )
                 })

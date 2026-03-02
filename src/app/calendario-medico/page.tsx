@@ -15,6 +15,8 @@ import {
   isSameDay,
   eachDayOfInterval,
   parseISO,
+  addHours,
+  subHours,
 } from 'date-fns'
 import { useSearchParams, usePathname, useRouter } from 'next/navigation'
 import {
@@ -115,10 +117,12 @@ function GuardiaCard({
   shift,
   getUserStatus,
   onShiftClick,
+  hasOverlap = false,
 }: {
   shift: any
   getUserStatus: (shift: any) => UserStatus
   onShiftClick: (shift: any) => void
+  hasOverlap?: boolean
 }) {
   const status = getUserStatus(shift)
   const config = STATUS_CONFIG[status]
@@ -131,8 +135,11 @@ function GuardiaCard({
     <button
       type="button"
       onClick={() => onShiftClick(shift)}
-      className={`group w-full cursor-pointer rounded-xl border p-2 text-left transition-all duration-300 hover:shadow-md hover:scale-[1.02] xl:p-2.5 ${config.bgClass} ${status === 'completada' ? 'opacity-80' : ''}`}
+      className={`group w-full cursor-pointer rounded-xl border p-2 text-left transition-all duration-300 hover:shadow-md hover:scale-[1.02] xl:p-2.5 relative ${config.bgClass} ${status === 'completada' ? 'opacity-80' : ''}`}
     >
+      {hasOverlap && status === 'disponible' && (
+        <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] font-bold px-1 rounded leading-tight">⚠️</span>
+      )}
       <div className="mb-1 flex items-center gap-1.5">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${config.dotClass}`} />
         <span className={`truncate text-[11px] font-semibold leading-tight xl:text-xs ${config.textClass}`}>
@@ -165,10 +172,12 @@ function GuardiaCardMobile({
   shift,
   getUserStatus,
   onShiftClick,
+  hasOverlap = false,
 }: {
   shift: any
   getUserStatus: (shift: any) => UserStatus
   onShiftClick: (shift: any) => void
+  hasOverlap?: boolean
 }) {
   const status = getUserStatus(shift)
   const config = STATUS_CONFIG[status]
@@ -181,8 +190,11 @@ function GuardiaCardMobile({
     <button
       type="button"
       onClick={() => onShiftClick(shift)}
-      className={`w-full cursor-pointer rounded-xl border border-l-[3px] bg-white p-3.5 text-left shadow-sm transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${config.mobileBorderClass} ${status === 'completada' ? 'opacity-80' : ''}`}
+      className={`w-full cursor-pointer rounded-xl border border-l-[3px] bg-white p-3.5 text-left shadow-sm transition-all duration-300 hover:shadow-md hover:scale-[1.01] relative ${config.mobileBorderClass} ${status === 'completada' ? 'opacity-80' : ''}`}
     >
+      {hasOverlap && status === 'disponible' && (
+        <span className="absolute top-2 right-2 bg-red-100 text-red-800 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200">⚠️ Superposición</span>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex items-center gap-2">
@@ -271,6 +283,25 @@ function CalendarioMedicoContent() {
   const [selectedUserStatus, setSelectedUserStatus] = useState<string>('')
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null)
   const [legendOpen, setLegendOpen] = useState(false)
+  const [myConfirmedShifts, setMyConfirmedShifts] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('medico_confirmed_cache')
+      return cached ? JSON.parse(cached) : []
+    }
+    return []
+  })
+
+  function checkOverlap(shiftDate: Date, durationHours: number): boolean {
+    const shiftEnd = addHours(shiftDate, durationHours)
+    for (const c of myConfirmedShifts) {
+      const confStart = parseISO(c.date_time)
+      const confEnd = addHours(confStart, c.duration_hours ?? 0)
+      const marginStart = subHours(confStart, 12)
+      const marginEnd = addHours(confEnd, 12)
+      if (shiftDate <= marginEnd && marginStart <= shiftEnd) return true
+    }
+    return false
+  }
 
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -290,7 +321,12 @@ function CalendarioMedicoContent() {
     const { data: openShifts } = await supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('status', 'open')
     const { data: myShifts } = await supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('professional_id', session.user.id)
     const { data: appsData } = await supabase.from('shift_applications').select('shift_id').eq('professional_id', session.user.id).eq('status', 'pending')
+    const { data: confirmedData } = await supabase.from('shifts').select('id, date_time, duration_hours').eq('professional_id', session.user.id).eq('status', 'filled')
 
+    if (confirmedData) {
+      setMyConfirmedShifts(confirmedData)
+      sessionStorage.setItem('medico_confirmed_cache', JSON.stringify(confirmedData))
+    }
     if (appsData) {
       const apps = appsData.map((a: { shift_id: string }) => a.shift_id)
       setMyApplications(apps)
@@ -631,6 +667,7 @@ function CalendarioMedicoContent() {
                               shift={g}
                               getUserStatus={getUserStatus}
                               onShiftClick={handleShiftClick}
+                              hasOverlap={checkOverlap(parseISO(g.date_time), Number(g.duration_hours) || 0)}
                             />
                           ))}
                         </div>
@@ -692,6 +729,7 @@ function CalendarioMedicoContent() {
                             shift={shift}
                             getUserStatus={getUserStatus}
                             onShiftClick={handleShiftClick}
+                            hasOverlap={checkOverlap(parseISO(shift.date_time), Number(shift.duration_hours) || 0)}
                           />
                         ))}
                       </div>
@@ -708,6 +746,7 @@ function CalendarioMedicoContent() {
         <DetalleGuardiaMedicoModal
           shift={selectedShift}
           userStatus={selectedUserStatus}
+          hasOverlap={checkOverlap(parseISO(selectedShift.date_time), Number(selectedShift.duration_hours) || 0)}
           onClose={() => setSelectedShift(null)}
           onRefresh={fetchData}
         />

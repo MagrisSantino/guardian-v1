@@ -1,0 +1,61 @@
+# REGLAS DEL PROYECTO GUARDIAN
+Eres un desarrollador experto en Next.js, Tailwind CSS y Supabase.
+
+## ESQUEMA DE LA BASE DE DATOS (SUPABASE)
+ESTRICTO: Nunca inventes nombres de columnas. Usa ÚNICAMENTE las columnas listadas a continuación para cada tabla.
+
+### 1. Tabla: `profiles` (Perfiles de usuarios)
+- `id` (uuid, primary key)
+- `full_name` (text)
+- `role` (text: 'doctor', 'clinic_admin', 'super_admin')
+- `is_verified` (boolean, default false)
+- `dni` (text)
+- `matricula` (text)
+- `specialty` (text)
+- `avatar_url` (text) - Foto de perfil
+- `cover_url` (text) - Foto de portada
+- `age` (integer)
+- `bio` (text)
+- `experience_tags` (text[]) - Array de strings para experiencia
+- `whatsapp` (text) - Número de contacto
+- `prestador_type` (text) - Tipo de clínica/prestador
+- `location_maps` (text) - Link de Google Maps
+- `km_from_cba` (integer) - Kilómetros desde Córdoba
+- `complexity` (text[]) - Array de strings (UTI, UCI, etc)
+- `resources` (text[]) - Array de strings (Rx, Laboratorio, etc)
+- `services` (text[]) - Array de strings (Urgencias, Domicilios, etc)
+
+### 2. Tabla: `shifts` (Guardias u Ofertas)
+- `id` (uuid, primary key)
+- `clinic_id` (uuid, foreign key a profiles.id)
+- `title` (text)
+- `specialty_required` (text)
+- `date_time` (timestamp/text)
+- `duration_hours` (integer)
+- `price` (numeric/integer)
+- `status` (text: 'open', 'filled', 'completed')
+- `shift_category` (text) - 'Guardia' o 'Consultorio'
+- `viaticos` (text) - Ej: Pasajes hasta $50.000
+- `payment_timeframe` (text) - Ej: Del 1 al 10
+- `description` (text) - Detalles adicionales
+- `professional_id` (uuid, foreign key a profiles.id)
+
+### 3. Tabla: `shift_applications` (Postulaciones)
+- `id` (uuid, primary key)
+- `shift_id` (uuid, foreign key a shifts.id)
+- `professional_id` (uuid, foreign key a profiles.id)
+- `status` (text: 'pending', 'accepted', 'rejected')
+
+### 4. Tabla: `reviews` (Calificaciones)
+- `id` (uuid, primary key)
+- `shift_id` (uuid)
+- `reviewer_id` (uuid)
+- `reviewed_id` (uuid)
+- `rating` (integer 1-5)
+- `comment` (text)
+
+## REGLAS DE DISEÑO
+- Usa Tailwind CSS.
+- Mantiene el estilo "Glassmorphism" con colores `bg-slate-50`, texto `slate-900` y detalles en `blue-600`.
+- Usa bordes redondeados suaves (`rounded-xl` o `rounded-2xl`).
+- Las actualizaciones a Supabase deben coincidir con estos nombres exactos.

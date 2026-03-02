@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { AlertCircle } from 'lucide-react'
 
-export default function ExplorarGuardiaModal({ shift, onClose, onRefresh }: any) {
+export default function ExplorarGuardiaModal({ shift, onClose, onRefresh, onApply, onWithdraw, hasApplied, loadingBtn, hasOverlap = false }: any) {
   const [loading, setLoading] = useState(false)
   const [isVerified, setIsVerified] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
@@ -22,29 +22,23 @@ export default function ExplorarGuardiaModal({ shift, onClose, onRefresh }: any)
   }, [])
 
   async function handleApply() {
-    if (!isVerified) return; // Doble barrera de seguridad
-    setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    await supabase.from('shift_applications').insert([{ 
-      shift_id: shift.id, 
-      professional_id: session?.user.id, 
-      status: 'pending' 
-    }])
-    
-    const targetClinicId = shift.clinic_id || shift.clinic?.id;
-    if (targetClinicId) {
-      await supabase.from('notifications').insert([{
-        user_id: targetClinicId,
-        shift_id: shift.id,
-        title: '¡Nueva Postulación! 👨‍⚕️',
-        message: `Un profesional se acaba de postular a tu guardia: ${shift.title}.`
-      }])
+    if (!isVerified || hasOverlap) return
+    if (onApply) {
+      await onApply(shift.id)
+      onRefresh?.()
+      onClose()
+    } else {
+      setLoading(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: session?.user.id, status: 'pending' }])
+      const targetClinicId = shift.clinic_id || shift.clinic?.id
+      if (targetClinicId) {
+        await supabase.from('notifications').insert([{ user_id: targetClinicId, shift_id: shift.id, title: '¡Nueva Postulación! 👨‍⚕️', message: `Un profesional se acaba de postular a tu guardia: ${shift.title}.` }])
+      }
+      alert('¡Postulación enviada exitosamente!')
+      onRefresh?.()
+      onClose()
     }
-
-    alert('¡Postulación enviada exitosamente!')
-    onRefresh()
-    onClose()
   }
 
   return (
@@ -52,6 +46,12 @@ export default function ExplorarGuardiaModal({ shift, onClose, onRefresh }: any)
       <div className="bg-white border border-slate-200 p-6 md:p-8 rounded-3xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-blue-400"></div>
         
+        {hasOverlap && (
+          <div className="mb-4 bg-red-100 border-2 border-red-300 text-red-800 px-4 py-3 rounded-xl font-bold text-sm flex items-center gap-2">
+            ⚠️ Superposición de Horarios (Incompatible)
+          </div>
+        )}
+
         <div className="mb-6 pb-6 border-b border-slate-100">
           <div className="flex items-center gap-4 mb-3">
             <div className="h-14 w-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-3xl border border-blue-100 shadow-sm">🏥</div>
@@ -72,8 +72,8 @@ export default function ExplorarGuardiaModal({ shift, onClose, onRefresh }: any)
         {checkingAuth ? (
           <div className="py-4 text-center text-slate-500 font-bold animate-pulse">Verificando credenciales...</div>
         ) : isVerified ? (
-          <button onClick={handleApply} disabled={loading} className="w-full bg-slate-900 hover:bg-blue-700 text-white py-4 rounded-xl font-black text-lg transition-all shadow-xl hover:shadow-blue-900/20 hover:-translate-y-0.5">
-            {loading ? 'Procesando...' : 'Postularme a esta Guardia'}
+          <button onClick={handleApply} disabled={loading || hasOverlap} className="w-full bg-slate-900 hover:bg-blue-700 text-white py-4 rounded-xl font-black text-lg transition-all shadow-xl hover:shadow-blue-900/20 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+            {loading || loadingBtn === shift?.id ? 'Procesando...' : 'Postularme a esta Guardia'}
           </button>
         ) : (
           <div className="bg-red-50 border-2 border-red-100 rounded-xl p-4 text-center">

@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   ArrowRight,
-  Briefcase,
   Building2,
   Eye,
   EyeOff,
@@ -106,8 +105,8 @@ function RoleSelector({
   onRoleChange: (role: Role) => void
 }) {
   const roles: { key: Role; label: string; icon: typeof Stethoscope }[] = [
-    { key: 'doctor', label: 'Soy Medico', icon: Stethoscope },
-    { key: 'clinic_admin', label: 'Soy Clinica', icon: Building2 },
+    { key: 'doctor', label: 'Soy Médico', icon: Stethoscope },
+    { key: 'clinic_admin', label: 'Soy Prestador', icon: Building2 },
   ]
 
   return (
@@ -268,7 +267,6 @@ export default function RegistroPage() {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [matricula, setMatricula] = useState('')
-  const [specialty, setSpecialty] = useState('')
   const [institutionName, setInstitutionName] = useState('')
   const [address, setAddress] = useState('')
 
@@ -308,7 +306,6 @@ export default function RegistroPage() {
           role,
           dni: role === 'doctor' ? dni : null,
           matricula: role === 'doctor' ? matricula : null,
-          specialty: role === 'doctor' ? specialty : null,
           phone: phone || null,
           institution_name: role === 'clinic_admin' ? institutionName : null,
           address: role === 'clinic_admin' ? address : null,
@@ -428,44 +425,31 @@ export default function RegistroPage() {
                 {step === 3 && (
                   <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     {role === 'doctor' ? (
-                      <>
-                        <div className="grid grid-cols-2 gap-3">
-                          <FormInput
-                            id="matricula"
-                            label="Matricula"
-                            icon={FileText}
-                            placeholder="Ej: MP 1234"
-                            value={matricula}
-                            onChange={setMatricula}
-                            required
-                          />
-                          <FormInput
-                            id="especialidad"
-                            label="Especialidad"
-                            icon={Briefcase}
-                            placeholder="Ej: Pediatria"
-                            value={specialty}
-                            onChange={setSpecialty}
-                            required
-                          />
-                        </div>
-                      </>
+                      <FormInput
+                        id="matricula"
+                        label="Matrícula"
+                        icon={FileText}
+                        placeholder="Ej: MP 1234"
+                        value={matricula}
+                        onChange={setMatricula}
+                        required
+                      />
                     ) : (
                       <>
                         <FormInput
                           id="institucion"
-                          label="Nombre de la Institucion"
+                          label="Nombre de la Institución"
                           icon={Building2}
-                          placeholder="Nombre de la clinica"
+                          placeholder="Nombre del prestador"
                           value={institutionName}
                           onChange={setInstitutionName}
                           required
                         />
                         <FormInput
                           id="direccion"
-                          label="Direccion"
+                          label="Dirección"
                           icon={MapPin}
-                          placeholder="Direccion de la clinica"
+                          placeholder="Dirección del prestador"
                           value={address}
                           onChange={setAddress}
                           required

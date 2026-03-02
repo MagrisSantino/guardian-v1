@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { format, differenceInHours, parseISO } from 'date-fns'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, MessageCircle } from 'lucide-react'
 
-export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, userStatus }: any) {
+export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, userStatus, hasOverlap = false }: any) {
   const [loading, setLoading] = useState(false)
   const [isVerified, setIsVerified] = useState(false)
   const [isCheckingSecurity, setIsCheckingSecurity] = useState(true)
@@ -12,11 +12,29 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
   const [hasRated, setHasRated] = useState(false)
+  const [coordinatorPhone, setCoordinatorPhone] = useState<string | null>(null)
 
   useEffect(() => {
     checkSecurity()
     if (userStatus === 'completada') checkExistingReview()
   }, [])
+
+  useEffect(() => {
+    if (userStatus !== 'confirmado') return
+    const clinic = shift.clinic
+    const phone = clinic?.whatsapp || clinic?.phone
+    if (phone) {
+      setCoordinatorPhone(phone.replace(/\D/g, ''))
+      return
+    }
+    const clinicId = shift.clinic_id || clinic?.id
+    if (clinicId) {
+      supabase.from('profiles').select('whatsapp, phone').eq('id', clinicId).single().then(({ data }) => {
+        const n = data?.whatsapp || data?.phone
+        if (n) setCoordinatorPhone(n.replace(/\D/g, ''))
+      })
+    }
+  }, [userStatus, shift?.clinic_id, shift?.clinic])
 
   // AL ENTRAR AL MODAL, CHEQUEAMOS SI EL MÉDICO ES LEGAL
   async function checkSecurity() {
@@ -39,6 +57,7 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
       alert("Acceso denegado: Tu perfil aún no ha sido verificado por Guardian.")
       return;
     }
+    if (hasOverlap) return;
 
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
@@ -118,6 +137,12 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
         {/* Adorno superior estilo cristal */}
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-blue-400"></div>
 
+        {hasOverlap && (
+          <div className="mb-4 bg-red-100 border-2 border-red-300 text-red-800 px-4 py-3 rounded-xl font-bold text-sm flex items-center gap-2">
+            ⚠️ Superposición de Horarios (Incompatible)
+          </div>
+        )}
+
         <div className="mb-6 pb-6 border-b border-slate-100">
           <div className="flex items-center gap-4 mb-3">
             <div className="h-14 w-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-3xl border border-blue-100 shadow-sm">🏥</div>
@@ -141,7 +166,7 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
           <>
             {userStatus === 'disponible' && (
               isVerified ? (
-                <button onClick={handleApply} disabled={loading} className="w-full bg-slate-900 hover:bg-blue-700 text-white py-4 rounded-xl font-black text-lg transition-all shadow-xl hover:shadow-blue-900/20 hover:-translate-y-0.5">
+                <button onClick={handleApply} disabled={loading || hasOverlap} className="w-full bg-slate-900 hover:bg-blue-700 text-white py-4 rounded-xl font-black text-lg transition-all shadow-xl hover:shadow-blue-900/20 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
                   {loading ? 'Procesando...' : 'Postularme a esta Guardia'}
                 </button>
               ) : (
@@ -168,6 +193,22 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
         {userStatus === 'confirmado' && (
           <div className="text-center">
             <p className="text-emerald-600 font-bold mb-4 bg-emerald-50 py-3 rounded-xl border border-emerald-100 shadow-inner">✅ Guardia Asignada Confirmada</p>
+            <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-left">
+              <p className="text-sm font-bold text-emerald-800 mb-2">Contacto del Coordinador</p>
+              {coordinatorPhone ? (
+                <a
+                  href={`https://wa.me/${coordinatorPhone}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 w-full bg-[#25D366] hover:bg-[#20bd5a] text-white py-3 rounded-xl font-bold transition-all shadow-md hover:shadow-lg"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  Contactar por WhatsApp
+                </a>
+              ) : (
+                <p className="text-xs text-slate-500">Sin número de contacto cargado.</p>
+              )}
+            </div>
             <button onClick={handleCancelShift} disabled={loading} className="w-full bg-red-50 hover:bg-red-600 text-red-600 hover:text-white py-3 rounded-xl font-bold transition-all border border-red-200 hover:border-transparent">
               {loading ? '...' : 'Cancelar mi asistencia (Aviso)'}
             </button>
