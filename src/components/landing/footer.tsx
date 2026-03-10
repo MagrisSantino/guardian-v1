@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Shield } from "lucide-react"
+import { Shield, Instagram, Linkedin, Twitter } from "lucide-react"
 
 export function Footer() {
   return (
@@ -21,26 +21,51 @@ export function Footer() {
             2026 Guardian. Plataforma de Salud. Todos los derechos reservados.
           </p>
 
-          {/* Links */}
-          <div className="flex items-center gap-5 sm:gap-6">
-            <a
-              href="#"
-              className="text-xs text-muted-foreground transition-colors hover:text-foreground sm:text-sm"
-            >
-              Soporte
-            </a>
-            <a
-              href="#"
-              className="text-xs text-muted-foreground transition-colors hover:text-foreground sm:text-sm"
-            >
-              Términos
-            </a>
-            <a
-              href="#"
-              className="text-xs text-muted-foreground transition-colors hover:text-foreground sm:text-sm"
-            >
-              Privacidad
-            </a>
+          {/* Links legales + Redes */}
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-8 md:gap-10">
+            <div className="flex items-center gap-5 sm:gap-6">
+              <a
+                href="#"
+                className="text-xs text-muted-foreground transition-colors hover:text-foreground sm:text-sm"
+              >
+                Soporte
+              </a>
+              <a
+                href="#"
+                className="text-xs text-muted-foreground transition-colors hover:text-foreground sm:text-sm"
+              >
+                Términos
+              </a>
+              <a
+                href="#"
+                className="text-xs text-muted-foreground transition-colors hover:text-foreground sm:text-sm"
+              >
+                Privacidad
+              </a>
+            </div>
+            <div className="flex items-center gap-4" aria-label="Redes sociales">
+              <a
+                href="#"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-all hover:border-primary/30 hover:text-primary hover:shadow-md"
+                title="Instagram"
+              >
+                <Instagram className="h-4 w-4" />
+              </a>
+              <a
+                href="#"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-all hover:border-primary/30 hover:text-primary hover:shadow-md"
+                title="LinkedIn"
+              >
+                <Linkedin className="h-4 w-4" />
+              </a>
+              <a
+                href="#"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-all hover:border-primary/30 hover:text-primary hover:shadow-md"
+                title="X (Twitter)"
+              >
+                <Twitter className="h-4 w-4" />
+              </a>
+            </div>
           </div>
         </div>
       </div>

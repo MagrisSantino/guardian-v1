@@ -7,7 +7,6 @@ import {
   Bell,
   CheckCircle2,
   Clock,
-  User,
 } from "lucide-react"
 
 function FloatingCard({
@@ -47,7 +46,7 @@ export function Hero() {
         <div className="h-[250px] w-[250px] rounded-full bg-trust-blue-light/10 blur-[80px] lg:h-[400px] lg:w-[400px] lg:blur-[100px]" />
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-5 sm:px-6 pb-20 pt-16 sm:pb-24 sm:pt-20 lg:pt-28">
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-6 pb-20 pt-4 sm:pb-24 sm:pt-6 lg:pt-8">
         <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
           {/* Left: Copy */}
           <div className="relative z-10 mx-auto max-w-2xl text-center lg:mx-0 lg:text-left">
@@ -61,20 +60,19 @@ export function Hero() {
 
             <h1 className="text-3xl leading-[1.1] font-extrabold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl text-balance">
               <span className="text-primary-foreground">
-                Conectamos talento{" "}
+                Conectamos talento médico con{" "}
               </span>
-              <span className="text-primary-foreground">médico con </span>
               <span
                 className="bg-gradient-to-r from-[#60a5fa] via-[#818cf8] to-[#a78bfa] bg-clip-text text-transparent"
               >
-                oportunidades reales
+                las mejores oportunidades
               </span>
             </h1>
 
             <p className="mx-auto mt-5 max-w-lg text-base leading-relaxed text-primary-foreground/60 sm:mt-6 sm:text-lg lg:mx-0">
-              Guardian es el ecosistema inteligente que simplifica la cobertura
-              de guardias. Sin intermediarios, sin demoras y con un sistema de
-              reputación que premia la excelencia.
+              Guardian es el ecosistema inteligente que optimiza y simplifica la
+              organización de las guardias médicas. Sin intermediarios, sin
+              demoras y con un sistema de reputación que premia la excelencia.
             </p>
 
             <div className="mt-8 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row sm:gap-4 lg:justify-start">
@@ -91,30 +89,6 @@ export function Hero() {
               >
                 Iniciar Sesión
               </a>
-            </div>
-
-            <div className="mt-8 flex items-center justify-center gap-4 sm:mt-10 sm:gap-6 lg:justify-start">
-              <div className="flex -space-x-2">
-                {[
-                  "bg-blue-400",
-                  "bg-emerald-400",
-                  "bg-amber-400",
-                  "bg-rose-400",
-                ].map((bg, i) => (
-                  <div
-                    key={i}
-                    className={`flex h-7 w-7 items-center justify-center rounded-full ${bg} ring-2 ring-navy text-[10px] font-bold text-foreground sm:h-8 sm:w-8`}
-                  >
-                    <User className="h-3 w-3 text-white sm:h-3.5 sm:w-3.5" />
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-primary-foreground/50 sm:text-sm">
-                <span className="font-semibold text-primary-foreground/80">
-                  +500
-                </span>{" "}
-                profesionales ya confían en Guardian
-              </p>
             </div>
           </div>
 

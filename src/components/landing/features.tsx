@@ -12,35 +12,35 @@ const features = [
     icon: Zap,
     title: "Conexión Instantánea",
     description:
-      "Olvidate de los grupos de WhatsApp desorganizados. Postulate a guardias y encontrá médicos con un solo clic.",
+      "Olvidate de los grupos de WhatsApp desorganizados. Encontrá profesionales de calidad y las mejores ofertas de trabajo con un solo clic.",
     span: "lg:col-span-2",
   },
   {
     icon: ShieldCheck,
     title: "Perfiles Verificados",
     description:
-      "Validamos las matrículas (MP/MN) de todos los profesionales para garantizar la máxima seguridad legal a las instituciones.",
+      "Validamos las credenciales de todos los profesionales e instituciones para garantizar la máxima seguridad.",
     span: "lg:col-span-1",
   },
   {
     icon: Star,
     title: "Ecosistema de Confianza",
     description:
-      "El primer sistema de reputación bidireccional. Médicos y clínicas se califican mutuamente tras cada guardia finalizada.",
+      "El primer sistema de reputación bidireccional. Médicos y Clínicas se califican mutuamente tras cada guardia finalizada.",
     span: "lg:col-span-1",
   },
   {
     icon: CalendarDays,
     title: "Agenda Inteligente",
     description:
-      "Visualizá tus guardias disponibles, postulaciones pendientes y turnos confirmados en un calendario codificado por colores.",
+      "Visualizá todas las guardias disponibles, postulaciones pendientes y confirmadas en un calendario pensado para vos.",
     span: "lg:col-span-1",
   },
   {
     icon: Bell,
     title: "Alertas en Tiempo Real",
     description:
-      "Recibí notificaciones directas cuando te asignan una guardia, hay una vacante urgente o si alguien cancela a último momento.",
+      "Recibí notificaciones en tiempo real cuando te asignen una guardia, si hay una vacante urgente o si alguien cancela a último momento.",
     span: "lg:col-span-1",
   },
   {

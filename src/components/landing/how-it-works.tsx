@@ -6,21 +6,21 @@ const steps = [
     icon: UserPlus,
     title: "Creá tu Perfil",
     description:
-      "Registrate gratis, cargá tu matrícula, especialidades y años de experiencia para validar tu identidad.",
+      "Registrate gratis, verificá tus credenciales para validar tu identidad (médico o clínica), y comenzá a navegar.",
   },
   {
     number: "02",
     icon: Search,
     title: "Explorá o Publicá",
     description:
-      "Las clínicas publican sus necesidades. Los médicos filtran por valor, fecha y especialidad desde su Bolsa de Trabajo.",
+      "Las clínicas publican sus vacantes y necesidades. Y los médicos filtran según su criterio para postularse.",
   },
   {
     number: "03",
     icon: Handshake,
     title: "Match y Calificación",
     description:
-      "La clínica selecciona al mejor candidato basándose en sus estrellas. Al finalizar, ambos se evalúan mutuamente.",
+      "La clínica selecciona entre los postulantes según su criterio. Al finalizar, ambos (médico y clínica) se evalúan mutuamente.",
   },
 ]
 

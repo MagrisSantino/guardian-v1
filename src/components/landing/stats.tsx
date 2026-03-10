@@ -10,9 +10,9 @@ const stats = [
     icon: BadgePercent,
   },
   {
-    value: "+500",
-    label: "Guardias Cubiertas",
-    description: "Y sigue creciendo",
+    value: "150+",
+    label: "Usuarios Registrados",
+    description: "Clínicas y médicos",
     icon: ShieldCheck,
   },
   {

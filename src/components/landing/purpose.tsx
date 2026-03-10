@@ -20,11 +20,13 @@ export function Purpose() {
             {/* Quote marks deco */}
             <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-6xl font-serif text-primary/10 select-none leading-none sm:-top-6 sm:text-8xl">&quot;</div>
             <p className="relative text-base leading-relaxed text-muted-foreground sm:text-lg lg:text-xl lg:leading-relaxed text-pretty">
-              En Argentina, conseguir cobertura médica de urgencia suele ser un
-              proceso caótico y desgastante. Guardian nace para profesionalizar
-              esta conexión. Queremos que el foco de las instituciones esté en
+              Actualmente en la Argentina, conseguir cobertura médica de urgencia
+              suele ser un proceso caótico y desgastante tanto para el médico
+              como para los prestadores. Guardian nace para profesionalizar esta
+              conexión. Queremos que el foco de las instituciones esté en
               salvar vidas, no en buscar reemplazos, y que los médicos sean
-              valorados justamente por su responsabilidad y trato humano.
+              valorados justamente por su profesionalismo, responsabilidad y
+              trato humano.
             </p>
           </div>
 

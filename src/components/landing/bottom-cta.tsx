@@ -2,7 +2,7 @@ import { ArrowRight } from "lucide-react"
 
 export function BottomCTA() {
   return (
-    <section className="relative px-4 pb-16 sm:px-6 sm:pb-20 lg:pb-36">
+    <section className="relative px-4 pt-16 pb-16 sm:px-6 sm:pt-20 sm:pb-20 lg:pt-36 lg:pb-36">
       <div className="relative mx-auto max-w-5xl overflow-hidden rounded-2xl bg-navy p-8 sm:rounded-3xl sm:p-12 lg:p-20">
         {/* Background effects */}
         <div
@@ -29,9 +29,9 @@ export function BottomCTA() {
               tu gestión?
             </span>
           </h2>
-          <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-primary-foreground/55 sm:mt-6 sm:text-lg">
-            Unite a la comunidad médica más moderna hoy mismo. Es 100% gratis
-            para profesionales de la salud.
+          <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-primary-foreground/55 sm:mt-6 sm:text-lg text-pretty">
+            Unite a la comunidad médica más moderna de la Argentina. Si sos un
+            profesional de la salud, comenzá hoy mismo 100% gratis.
           </p>
 
           <div className="relative z-10 mt-8 flex flex-col items-center gap-3 sm:mt-10 sm:flex-row sm:justify-center sm:gap-4">
