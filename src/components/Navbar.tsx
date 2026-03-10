@@ -11,6 +11,7 @@ export default function Navbar() {
   const [role, setRole] = useState<string | null>(null)
   const [profileName, setProfileName] = useState<string | null>(null)
   const [isVerified, setIsVerified] = useState<boolean | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -35,10 +36,11 @@ export default function Navbar() {
       const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user || null)
       if (session?.user) {
-        const { data } = await supabase.from('profiles').select('role, full_name, is_verified').eq('id', session.user.id).single()
+        const { data } = await supabase.from('profiles').select('role, full_name, is_verified, avatar_url').eq('id', session.user.id).single()
         setRole(data?.role ?? null)
         setProfileName(data?.full_name ?? null)
         setIsVerified(data?.is_verified ?? null)
+        setAvatarUrl(data?.avatar_url ?? null)
         fetchNotifications(session.user.id)
       }
     }
@@ -47,16 +49,18 @@ export default function Navbar() {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null)
       if (session?.user) {
-        supabase.from('profiles').select('role, full_name, is_verified').eq('id', session.user.id).single().then(({ data }) => {
+        supabase.from('profiles').select('role, full_name, is_verified, avatar_url').eq('id', session.user.id).single().then(({ data }) => {
           setRole(data?.role ?? null)
           setProfileName(data?.full_name ?? null)
           setIsVerified(data?.is_verified ?? null)
+          setAvatarUrl(data?.avatar_url ?? null)
         })
         fetchNotifications(session.user.id)
       } else {
         setRole(null)
         setProfileName(null)
         setIsVerified(null)
+        setAvatarUrl(null)
         setNotifications([])
       }
     })
@@ -264,9 +268,17 @@ export default function Navbar() {
                     onClick={() => setShowUserMenu(!showUserMenu)}
                     className="flex items-center gap-2 rounded-xl pl-1.5 py-1.5 pr-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
                   >
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
-                      {initials}
-                    </div>
+                    {avatarUrl ? (
+                      <img 
+                        src={avatarUrl} 
+                        alt={displayName} 
+                        className="h-7 w-7 rounded-full object-cover border border-slate-200" 
+                      />
+                    ) : (
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+                        {initials}
+                      </div>
+                    )}
                     <span className="max-w-[120px] truncate">{displayName}</span>
                   </button>
                   {showUserMenu && (
@@ -323,9 +335,17 @@ export default function Navbar() {
               ) : (
                 <>
                   <div className="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
-                      {initials}
-                    </div>
+                    {avatarUrl ? (
+                      <img 
+                        src={avatarUrl} 
+                        alt={displayName} 
+                        className="h-10 w-10 shrink-0 rounded-full object-cover border border-slate-200 shadow-sm" 
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                        {initials}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900 truncate">{displayName}</p>
                       <p className="text-xs text-slate-500">

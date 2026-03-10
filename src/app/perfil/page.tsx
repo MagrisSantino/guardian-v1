@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { BadgeCheck, AlertCircle, LogOut, Save, User } from 'lucide-react'
+import { BadgeCheck, AlertCircle, LogOut, Save, User, Camera, Loader2 } from 'lucide-react'
 
 export default function Perfil() {
   const [profile, setProfile] = useState<any>(null)
@@ -14,6 +14,11 @@ export default function Perfil() {
   const [whatsapp, setWhatsapp] = useState('')
   const [bio, setBio] = useState('')
   const [experienceTags, setExperienceTags] = useState<string[]>([])
+  
+  // Nuevos estados para la foto de perfil
+  const [avatarUrl, setAvatarUrl] = useState<string>('')
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -58,8 +63,11 @@ export default function Perfil() {
       setAge(data.age != null ? String(data.age) : '')
       setWhatsapp(data.whatsapp || meta.whatsapp || '')
       setBio(data.bio || meta.bio || '')
+      setAvatarUrl(data.avatar_url || '')
+      
       const tags = data.experience_tags
       setExperienceTags(Array.isArray(tags) ? tags : (typeof tags === 'string' ? (tags ? [tags] : []) : []))
+      
       if (data.role === 'clinic_admin') {
         setProviderType(data.prestador_type || meta.prestador_type || '')
         setInstitutionDescription(data.bio ?? '')
@@ -86,10 +94,64 @@ export default function Perfil() {
     setLoading(false)
   }
 
+  // Función para subir la foto a Supabase Storage con límite de tamaño
+  async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
+    try {
+      setUploadingAvatar(true)
+      
+      if (!event.target.files || event.target.files.length === 0) {
+        throw new Error('Debes seleccionar una imagen.')
+      }
+      
+      const file = event.target.files[0]
+
+      // --- VALIDACIONES DE SEGURIDAD ---
+      // 1. Validar tamaño (Límite: 2MB)
+      const maxSizeInBytes = 2 * 1024 * 1024; // 2 Megabytes
+      if (file.size > maxSizeInBytes) {
+        throw new Error('La imagen es demasiado pesada. El tamaño máximo permitido es 2MB.')
+      }
+
+      // 2. Validar que sea estrictamente una imagen
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Formato inválido. Por favor, sube solo archivos de imagen (JPG, PNG, etc).')
+      }
+      // ---------------------------------
+
+      const fileExt = file.name.split('.').pop()
+      const filePath = `${profile.id}-${Math.random()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
+      setAvatarUrl(data.publicUrl)
+    } catch (error: any) {
+      alert('Error: ' + error.message)
+    } finally {
+      // Limpiamos el input para que el usuario pueda volver a intentar si se equivocó
+      event.target.value = ''
+      setUploadingAvatar(false)
+    }
+  }
+
   async function handleSave() {
     setSaving(true)
     const updateData = profile.role === 'doctor'
-      ? { full_name: fullName, dni, matricula, specialty, age: age ? Number(age) : null, whatsapp: whatsapp || null, bio: bio || null, experience_tags: experienceTags }
+      ? { 
+          full_name: fullName, 
+          dni, 
+          matricula, 
+          specialty, 
+          age: age ? Number(age) : null, 
+          whatsapp: whatsapp || null, 
+          bio: bio || null, 
+          experience_tags: experienceTags,
+          avatar_url: avatarUrl // Guardamos la URL de la foto en la base de datos
+        }
       : {
           full_name: fullName,
           prestador_type: providerType || null,
@@ -128,13 +190,41 @@ export default function Perfil() {
         {/* ENCABEZADO DEL PERFIL */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6 relative overflow-hidden">
           {isDoctor ? (
-            /* Vista tipo red social: portada + avatar circular */
             <>
               <div className="h-32 md:h-40 w-full bg-gradient-to-br from-blue-600 via-blue-500 to-slate-600" aria-hidden />
               <div className="px-6 md:px-8 pb-6 -mt-14 md:-mt-16 relative">
-                <div className="w-28 h-28 md:w-32 md:h-32 bg-white rounded-full flex items-center justify-center shrink-0 border-4 border-white shadow-lg shadow-slate-200/80 mx-auto md:mx-0">
-                  <User className="w-14 h-14 md:w-16 md:h-16 text-slate-400" />
+                
+                {/* Contenedor de la Foto de Perfil Interactiva */}
+                <div className="w-28 h-28 md:w-32 md:h-32 bg-white rounded-full flex flex-col items-center justify-center shrink-0 border-4 border-white shadow-lg shadow-slate-200/80 mx-auto md:mx-0 relative group overflow-hidden">
+                  <label className="absolute inset-0 w-full h-full cursor-pointer z-10">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={uploadAvatar} 
+                      disabled={uploadingAvatar} 
+                    />
+                    {/* Overlay que aparece al pasar el mouse */}
+                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Camera className="w-6 h-6 text-white mb-1" />
+                      <span className="text-white text-xs font-bold">Cambiar</span>
+                    </div>
+                  </label>
+                  
+                  {uploadingAvatar ? (
+                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                  ) : avatarUrl ? (
+                    <img src={avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-14 h-14 md:w-16 md:h-16 text-slate-400" />
+                  )}
                 </div>
+                
+                {/* Texto indicativo debajo de la foto */}
+                <p className="text-[10px] md:text-xs text-slate-500 text-center md:text-left mt-2">
+                  <span className="text-red-500 font-bold">*</span> Foto obligatoria para verificar
+                </p>
+
                 <div className="text-center md:text-left mt-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-center md:justify-start gap-2 mb-1">
                     <h1 className="text-2xl md:text-3xl font-black text-slate-900">{fullName || 'Usuario'}</h1>
@@ -151,17 +241,28 @@ export default function Perfil() {
                   <p className="text-slate-500 font-medium">Profesional Médico</p>
                 </div>
               </div>
+
+              {/* Banners de advertencia */}
               {!isVerified && (
-                <div className="mx-6 md:mx-8 mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3 text-sm text-blue-800">
-                  <AlertCircle className="w-5 h-5 shrink-0 text-blue-600" />
-                  <p>
-                    <strong>Para poder postularte a guardias</strong>, necesitamos que completes tu DNI y Matrícula. Nuestro equipo validará tu identidad a la brevedad para darte el Tilde Azul.
-                  </p>
+                <div className="flex flex-col gap-3 mx-6 md:mx-8 mb-6">
+                  {!avatarUrl && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 text-sm text-amber-800">
+                      <AlertCircle className="w-5 h-5 shrink-0 text-amber-600" />
+                      <p>
+                        <strong>⚠️ Foto de perfil faltante:</strong> Sube una foto tuya clara (tipo carnet) haciendo clic en el círculo de arriba. Nuestro equipo la necesita para validar tu identidad.
+                      </p>
+                    </div>
+                  )}
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3 text-sm text-blue-800">
+                    <AlertCircle className="w-5 h-5 shrink-0 text-blue-600" />
+                    <p>
+                      <strong>Para poder postularte a guardias</strong>, necesitamos que completes tu DNI y Matrícula. Nuestro equipo validará tu identidad a la brevedad para darte el Tilde Azul.
+                    </p>
+                  </div>
                 </div>
               )}
             </>
           ) : (
-            /* Prestador: layout original */
             <div className="p-6 md:p-8 relative">
               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-blue-400"></div>
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
