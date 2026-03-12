@@ -2,10 +2,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import ExplorarGuardiaModal from '@/components/ExplorarGuardiaModal'
-import SkeletonGuardia from '@/components/SkeletonGuardia' 
+import SkeletonGuardia from '@/components/SkeletonGuardia'
+import { FilterBar } from '@/components/FilterBar'
+import { GuardiaCard } from '@/components/GuardiaCard'
 import { format, parseISO, addHours, subHours } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Search, Filter } from 'lucide-react' 
+import { Activity, CalendarDays, Ambulance } from 'lucide-react'
 
 export default function DashboardMedico() {
   const [shifts, setShifts] = useState<any[]>(() => {
@@ -31,6 +33,8 @@ export default function DashboardMedico() {
   const [selectedShift, setSelectedShift] = useState<any>(null)
 
   const [searchTerm, setSearchTerm] = useState('')
+  const [filterFromDate, setFilterFromDate] = useState('')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedSpecialty, setSelectedSpecialty] = useState('Todas')
   const [sortBy, setSortBy] = useState<'recent' | 'price_high' | 'price_low'>('recent')
   const [myConfirmedShifts, setMyConfirmedShifts] = useState<any[]>(() => {
@@ -140,8 +144,12 @@ export default function DashboardMedico() {
 
   const filteredShifts = shifts.filter(shift => {
     const matchesSearch = (shift.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           shift.clinic?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
+                         shift.clinic?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesSpecialty = selectedSpecialty === 'Todas' || shift.specialty_required === selectedSpecialty;
+    if (filterFromDate) {
+      const shiftDay = format(parseISO(shift.date_time), 'yyyy-MM-dd');
+      if (shiftDay < filterFromDate) return false;
+    }
     return matchesSearch && matchesSpecialty;
   })
 
@@ -154,53 +162,31 @@ export default function DashboardMedico() {
 
   const uniqueSpecialties = ['Todas', ...Array.from(new Set(shifts.map(s => s.specialty_required).filter(Boolean)))]
 
-  if (!mounted) return <main className="min-h-[calc(100vh-73px)] bg-slate-50 p-6 md:p-8"></main>
+  if (!mounted) return <main className="min-h-[calc(100vh-73px)] bg-slate-50"></main>
 
   return (
-    <main className="min-h-[calc(100vh-73px)] bg-slate-50 p-6 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
-          <div>
-            <h1 className="text-3xl font-bold mb-2 text-slate-900">Bolsa de Trabajo</h1>
-            <p className="text-slate-500 text-base">Explora detalles de la clínica, sus reseñas y postulate.</p>
-          </div>
+    <main className="min-h-[calc(100vh-73px)] bg-slate-50">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold text-slate-900">Guardias disponibles</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Explora detalles de la clínica, sus reseñas y postúlate.
+          </p>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Buscar por clínica o puesto..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm font-medium text-slate-700"
-            />
-          </div>
-          <div className="w-full md:w-56 relative">
-            <Filter className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-            <select 
-              value={selectedSpecialty}
-              onChange={(e) => setSelectedSpecialty(e.target.value)}
-              className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer"
-            >
-              {uniqueSpecialties.map(spec => (
-                <option key={spec as string} value={spec as string}>{spec}</option>
-              ))}
-            </select>
-          </div>
-          <div className="w-full md:w-56 relative">
-            <select 
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'recent' | 'price_high' | 'price_low')}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm font-medium text-slate-700 appearance-none cursor-pointer"
-            >
-              <option value="recent">Más recientes primero</option>
-              <option value="price_high">Mayor precio</option>
-              <option value="price_low">Menor precio</option>
-            </select>
-          </div>
-        </div>
+        <FilterBar
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          filterFromDate={filterFromDate}
+          setFilterFromDate={setFilterFromDate}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          selectedSpecialty={selectedSpecialty}
+          setSelectedSpecialty={setSelectedSpecialty}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+          uniqueSpecialties={uniqueSpecialties as string[]}
+        />
 
         {isFetching && shifts.length === 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -209,60 +195,35 @@ export default function DashboardMedico() {
         ) : sortedShifts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm">
             <p className="text-slate-500 font-medium">No se encontraron guardias con esos filtros.</p>
-            <button onClick={() => {setSearchTerm(''); setSelectedSpecialty('Todas');}} className="mt-4 text-blue-600 font-bold hover:underline">
+            <button onClick={() => { setSearchTerm(''); setSelectedSpecialty('Todas'); setFilterFromDate(''); }} className="mt-4 text-blue-600 font-bold hover:underline">
               Limpiar filtros
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortedShifts.map(shift => {
-               const shiftDate = parseISO(shift.date_time)
-               const hasApplied = myApplications.includes(shift.id)
-               const hasOverlap = shift.status === 'open' && checkOverlap(shiftDate, Number(shift.duration_hours) || 0, shift.id)
-               const kmCba = shift.clinic?.km_from_cordoba ?? shift.clinic?.km_from_cba
-               const category = shift.shift_category || 'Guardia'
+          <div
+            className={
+              viewMode === 'list'
+                ? 'flex flex-col gap-4'
+                : 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3'
+            }
+          >
+            {sortedShifts.map((shift) => {
+              const shiftDate = parseISO(shift.date_time)
+              const hasApplied = myApplications.includes(shift.id)
+              const hasOverlap =
+                shift.status === 'open' &&
+                checkOverlap(shiftDate, Number(shift.duration_hours) || 0, shift.id)
 
-               return (
-                <div 
-                  key={shift.id} 
+              return (
+                <GuardiaCard
+                  key={shift.id}
+                  shift={shift}
+                  viewMode={viewMode}
+                  hasApplied={hasApplied}
+                  hasOverlap={hasOverlap}
                   onClick={() => setSelectedShift(shift)}
-                  className={`bg-white p-6 rounded-xl border-2 transition-all flex flex-col justify-between group cursor-pointer relative shadow-sm hover:shadow-md ${hasApplied ? 'border-orange-300 hover:border-orange-400' : 'border-slate-200 hover:border-blue-400'}`}
-                >
-                  {hasOverlap && (
-                    <div className="mb-3 bg-red-100 text-red-800 text-[10px] font-bold px-3 py-2 rounded-lg border-2 border-red-300 uppercase tracking-wider text-center">
-                      ⚠️ Superposición de Horarios (Incompatible)
-                    </div>
-                  )}
-                  {hasApplied && !hasOverlap && (
-                    <div className="absolute top-4 right-4 bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-1 rounded border border-orange-200 uppercase tracking-wider">
-                       Postulado ✓
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="flex justify-between items-start mb-4 flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm text-slate-900 font-bold mb-1 group-hover:text-blue-600 transition-colors">{shift.clinic?.full_name || 'Sanatorio Confidencial'}</h4>
-                        <div className="flex flex-wrap gap-1.5 items-center">
-                          <span className="bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">{shift.specialty_required}</span>
-                          <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">{category}</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <h3 className="text-lg font-bold mb-4 text-slate-800">{shift.title}</h3>
-                    <p className="text-2xl font-bold text-emerald-600 mb-4">${shift.price.toLocaleString()}</p>
-                    
-                    <div className="space-y-2.5 pt-4 border-t border-slate-100">
-                      <div className="flex items-center text-slate-600 text-sm gap-3"><span className="text-slate-400">📅</span> <span className="capitalize font-medium">{format(shiftDate, "EEEE d 'de' MMMM", { locale: es })}</span></div>
-                      <div className="flex items-center text-slate-600 text-sm gap-3"><span className="text-slate-400">⏰</span> <span>{format(shiftDate, 'HH:mm')}hs ({shift.duration_hours}hs)</span></div>
-                      {kmCba != null && Number(kmCba) > 0 && (
-                        <div className="flex items-center text-slate-600 text-sm gap-3"><span className="text-slate-400">📍</span> <span>a {Number(kmCba)} km de CBA</span></div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-               )
+                />
+              )
             })}
           </div>
         )}

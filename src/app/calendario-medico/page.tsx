@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import DetalleGuardiaMedicoModal from '@/components/DetalleGuardiaMedicoModal'
+import ExplorarGuardiaModal from '@/components/ExplorarGuardiaModal'
 import {
   format,
   addMonths,
@@ -18,6 +19,7 @@ import {
   addHours,
   subHours,
 } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { useSearchParams, usePathname, useRouter } from 'next/navigation'
 import {
   ChevronLeft,
@@ -30,6 +32,10 @@ import {
   CalendarDays,
   UserCheck,
   CheckCircle2,
+  Activity,
+  ClipboardList,
+  Ambulance,
+  X,
 } from 'lucide-react'
 
 /* ─────────────────────────────────────────────
@@ -290,6 +296,11 @@ function CalendarioMedicoContent() {
     }
     return []
   })
+  const [blockedDates, setBlockedDates] = useState<string[]>([])
+  const [selectedBlockedDates, setSelectedBlockedDates] = useState<string[]>([])
+  const [isSelectingDays, setIsSelectingDays] = useState(false)
+  const [selectedDayShifts, setSelectedDayShifts] = useState<any[] | null>(null)
+  const [selectedShiftForModal, setSelectedShiftForModal] = useState<any | null>(null)
 
   function checkOverlap(shiftDate: Date, durationHours: number, excludeShiftId?: string): boolean {
     const shiftEnd = addHours(shiftDate, durationHours)
@@ -319,10 +330,20 @@ function CalendarioMedicoContent() {
     if (!session) return
     setUserId(session.user.id)
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('blocked_dates')
+      .eq('id', session.user.id)
+      .single()
+
     const { data: openShifts } = await supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('status', 'open')
     const { data: myShifts } = await supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('professional_id', session.user.id)
     const { data: appsData } = await supabase.from('shift_applications').select('shift_id').eq('professional_id', session.user.id).eq('status', 'pending')
     const { data: confirmedData } = await supabase.from('shifts').select('id, date_time, duration_hours').eq('professional_id', session.user.id).eq('status', 'filled')
+
+    const blocked = Array.isArray(profile?.blocked_dates) ? profile.blocked_dates : []
+    setBlockedDates(blocked)
+    if (!isSelectingDays) setSelectedBlockedDates(blocked)
 
     if (confirmedData) {
       setMyConfirmedShifts(confirmedData)
@@ -397,6 +418,32 @@ function CalendarioMedicoContent() {
   const goToday = () => {
     setCurrentDate(new Date())
     setSelectedWeek(null)
+  }
+
+  const effectiveBlockedDates = isSelectingDays ? selectedBlockedDates : blockedDates
+
+  const toggleBlockedDate = (dateKey: string) => {
+    setSelectedBlockedDates((prev) =>
+      prev.includes(dateKey) ? prev.filter((d) => d !== dateKey) : [...prev, dateKey]
+    )
+  }
+
+  const enterSelectingDays = () => {
+    setSelectedBlockedDates([...blockedDates])
+    setIsSelectingDays(true)
+  }
+
+  const saveBlockedDates = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    await supabase.from('profiles').update({ blocked_dates: selectedBlockedDates }).eq('id', session.user.id)
+    setBlockedDates(selectedBlockedDates)
+    setIsSelectingDays(false)
+  }
+
+  const cancelSelectingDays = () => {
+    setSelectedBlockedDates([...blockedDates])
+    setIsSelectingDays(false)
   }
 
   const monthStart = startOfMonth(currentDate)
@@ -536,6 +583,32 @@ function CalendarioMedicoContent() {
               >
                 Hoy
               </button>
+              {!isSelectingDays ? (
+                <button
+                  type="button"
+                  onClick={enterSelectingDays}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-all duration-200 hover:bg-slate-100"
+                >
+                  Marcar Disponibilidad / Ocupado
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={saveBlockedDates}
+                    className="rounded-xl border border-emerald-200 bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-all duration-200 hover:bg-emerald-700"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelSelectingDays}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-all duration-200 hover:bg-slate-100"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
             </div>
             <div className="hidden md:block">
               <StatusLegend />
@@ -579,17 +652,20 @@ function CalendarioMedicoContent() {
                       key={weekIdx}
                       type="button"
                       className={`grid w-full grid-cols-7 border-b border-slate-100 last:border-b-0 transition-colors ${isActive ? 'bg-blue-500/10' : 'hover:bg-slate-50'}`}
-                      onClick={() => setSelectedWeek(weekIdx)}
+                      onClick={() => !isSelectingDays && setSelectedWeek(weekIdx)}
                     >
                       {weekDays.map((day, ci) => {
                         const dateKey = format(day, 'yyyy-MM-dd')
                         const hasGuardias = (guardiasByDate[dateKey] || []).length > 0
                         const isCurrentMonth = isSameMonth(day, monthStart)
                         const isTodayCell = isCurrentMonth && isToday(day)
+                        const isBlocked = effectiveBlockedDates.includes(dateKey)
                         return (
                           <div
                             key={dateKey}
-                            className={`relative flex flex-col items-center justify-center py-2.5 ${!isCurrentMonth ? 'opacity-30' : ''}`}
+                            role={isSelectingDays ? 'button' : undefined}
+                            onClick={isSelectingDays ? (e) => { e.stopPropagation(); toggleBlockedDate(dateKey); } : undefined}
+                            className={`relative flex flex-col items-center justify-center py-2.5 ${!isCurrentMonth ? 'opacity-30' : ''} ${isBlocked ? 'bg-slate-200/80' : ''} ${isSelectingDays ? 'cursor-pointer' : ''}`}
                           >
                             <span
                               className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-medium ${
@@ -602,8 +678,11 @@ function CalendarioMedicoContent() {
                             >
                               {format(day, 'd')}
                             </span>
-                            {hasGuardias && (
+                            {hasGuardias && !isBlocked && (
                               <span className="mt-0.5 h-1 w-1 rounded-full bg-blue-500" />
+                            )}
+                            {isBlocked && (
+                              <span className="mt-0.5 h-1 w-1 rounded-full bg-slate-500" />
                             )}
                           </div>
                         )
@@ -621,14 +700,19 @@ function CalendarioMedicoContent() {
                 {getWeekDays(currentWeekIndex).map((day, ci) => {
                   const dateKey = format(day, 'yyyy-MM-dd')
                   const guardias = guardiasByDate[dateKey] || []
+                  const displayGuardias = guardias.slice(0, 2)
+                  const restCount = guardias.length - 2
                   const isCurrentMonth = isSameMonth(day, monthStart)
                   const isTodayCell = isCurrentMonth && isToday(day)
+                  const isBlocked = effectiveBlockedDates.includes(dateKey)
                   return (
                     <div
                       key={dateKey}
+                      role={isSelectingDays ? 'button' : undefined}
+                      onClick={isSelectingDays ? () => toggleBlockedDate(dateKey) : undefined}
                       className={`rounded-xl border bg-white transition-all duration-200 ${
                         isTodayCell ? 'border-blue-300 shadow-sm shadow-blue-500/10' : 'border-slate-200'
-                      } ${!isCurrentMonth ? 'opacity-40' : ''}`}
+                      } ${!isCurrentMonth ? 'opacity-40' : ''} ${isBlocked ? 'bg-slate-200/80' : ''} ${isSelectingDays ? 'cursor-pointer' : ''}`}
                     >
                       <div
                         className={`flex w-full items-center gap-2.5 px-3.5 py-2.5 ${guardias.length > 0 ? 'border-b border-slate-100' : ''}`}
@@ -653,16 +737,21 @@ function CalendarioMedicoContent() {
                               HOY
                             </span>
                           )}
+                          {isBlocked && (
+                            <span className="ml-2 rounded-md bg-slate-300 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
+                              Ocupado
+                            </span>
+                          )}
                         </div>
-                        {guardias.length > 0 && (
+                        {guardias.length > 0 && !isSelectingDays && (
                           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">
                             {guardias.length}
                           </span>
                         )}
                       </div>
-                      {guardias.length > 0 && (
+                      {guardias.length > 0 && !isSelectingDays && (
                         <div className="space-y-2 p-3">
-                          {guardias.map((g) => (
+                          {displayGuardias.map((g) => (
                             <GuardiaCardMobile
                               key={g.id}
                               shift={g}
@@ -671,6 +760,9 @@ function CalendarioMedicoContent() {
                               hasOverlap={getUserStatus(g) === 'disponible' && checkOverlap(parseISO(g.date_time), Number(g.duration_hours) || 0, g.id)}
                             />
                           ))}
+                          {restCount > 0 && (
+                            <p className="text-[10px] text-slate-500 font-medium">+{restCount} más</p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -698,19 +790,31 @@ function CalendarioMedicoContent() {
               <div className="grid grid-cols-7">
                 {calendarDays.map((day, cellIndex) => {
                   const dateKey = format(day, 'yyyy-MM-dd')
-                  const guardias = guardiasByDate[dateKey] || []
+                  const dayShifts = guardiasByDate[dateKey] || []
                   const isCurrentMonth = isSameMonth(day, monthStart)
                   const dayOfWeek = day.getDay()
                   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
                   const isTodayCell = isCurrentMonth && isToday(day)
                   const isLastInRow = cellIndex % 7 === 6
+                  const isBlocked = effectiveBlockedDates.includes(dateKey)
+                  const hasGuardias = dayShifts.length > 0
+
+                  const handleCellClick = () => {
+                    if (isSelectingDays) toggleBlockedDate(dateKey)
+                    else if (hasGuardias) setSelectedDayShifts(dayShifts)
+                  }
 
                   return (
                     <div
                       key={dateKey}
-                      className={`group relative min-h-[110px] border-b border-slate-100 p-2 transition-colors duration-200 hover:bg-blue-500/5 lg:min-h-[130px] ${!isLastInRow ? 'border-r border-slate-100' : ''} ${isWeekend ? 'bg-slate-50/50' : ''}`}
+                      role="button"
+                      onClick={handleCellClick}
+                      className={`group relative min-h-[110px] border-b border-slate-100 p-2 transition-colors duration-200 lg:min-h-[130px] ${!isLastInRow ? 'border-r border-slate-100' : ''} ${isWeekend ? 'bg-slate-50/50' : ''} ${isBlocked ? 'bg-slate-200/80' : hasGuardias ? 'cursor-pointer hover:bg-slate-50' : 'hover:bg-blue-500/5'} ${isSelectingDays ? 'cursor-pointer' : ''}`}
                     >
-                      <div className="mb-1.5 flex items-start">
+                      {isBlocked && (
+                        <div className="absolute inset-0 pointer-events-none bg-[repeating-linear-gradient(-45deg,transparent,transparent_6px,rgba(0,0,0,0.03)_6px,rgba(0,0,0,0.03)_8px)] rounded-sm" aria-hidden />
+                      )}
+                      <div className="mb-1.5 flex items-start relative z-10">
                         <span
                           className={`inline-flex h-7 w-7 items-center justify-center rounded-lg text-sm transition-all duration-200 ${
                             isTodayCell
@@ -723,16 +827,53 @@ function CalendarioMedicoContent() {
                           {format(day, 'd')}
                         </span>
                       </div>
-                      <div className="space-y-1.5">
-                        {guardias.map((shift) => (
-                          <GuardiaCard
-                            key={shift.id}
-                            shift={shift}
-                            getUserStatus={getUserStatus}
-                            onShiftClick={handleShiftClick}
-                            hasOverlap={getUserStatus(shift) === 'disponible' && checkOverlap(parseISO(shift.date_time), Number(shift.duration_hours) || 0, shift.id)}
-                          />
-                        ))}
+                      <div className="space-y-1.5 relative z-10">
+                        {dayShifts.length <= 2 ? (
+                          <>
+                            {dayShifts.map((shift) => (
+                              <div
+                                key={shift.id}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (!isSelectingDays) setSelectedShiftForModal(shift)
+                                }}
+                              >
+                                <GuardiaCard
+                                  shift={shift}
+                                  getUserStatus={getUserStatus}
+                                  onShiftClick={() => {}}
+                                  hasOverlap={
+                                    getUserStatus(shift) === 'disponible' &&
+                                    checkOverlap(
+                                      parseISO(shift.date_time),
+                                      Number(shift.duration_hours) || 0,
+                                      shift.id
+                                    )
+                                  }
+                                />
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="flex flex-wrap gap-1 mt-1 justify-center">
+                            {dayShifts.map((shift) => {
+                              const status = getUserStatus(shift)
+                              const statusConfig = STATUS_CONFIG[status]
+                              const category = shift.shift_category || 'Guardia'
+                              const CategoryIcon =
+                                category === 'Guardia'
+                                  ? Activity
+                                  : category === 'Consultorio'
+                                    ? ClipboardList
+                                    : Ambulance
+                              return (
+                                <span key={shift.id} className={statusConfig.textClass}>
+                                  <CategoryIcon className="h-4 w-4" />
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )
@@ -743,6 +884,46 @@ function CalendarioMedicoContent() {
         </div>
       </div>
 
+      {selectedDayShifts != null && selectedDayShifts.length > 0 && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
+              <h3 className="text-lg font-bold text-slate-900">
+                Guardias del {format(parseISO(selectedDayShifts[0].date_time), "d 'de' MMMM", { locale: es })}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedDayShifts(null)}
+                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                aria-label="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-3 flex-1 min-h-0">
+              {selectedDayShifts.map((s) => (
+                <div
+                  key={s.id}
+                  onClick={() => {
+                    setSelectedShiftForModal(s)
+                  }}
+                >
+                  <GuardiaCardMobile
+                    shift={s}
+                    getUserStatus={getUserStatus}
+                    onShiftClick={() => {}}
+                    hasOverlap={
+                      getUserStatus(s) === 'disponible' &&
+                      checkOverlap(parseISO(s.date_time), Number(s.duration_hours) || 0, s.id)
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedShift && (
         <DetalleGuardiaMedicoModal
           shift={selectedShift}
@@ -750,6 +931,22 @@ function CalendarioMedicoContent() {
           hasOverlap={selectedUserStatus === 'disponible' && checkOverlap(parseISO(selectedShift.date_time), Number(selectedShift.duration_hours) || 0, selectedShift.id)}
           onClose={() => setSelectedShift(null)}
           onRefresh={fetchData}
+        />
+      )}
+
+      {selectedShiftForModal && (
+        <ExplorarGuardiaModal
+          shift={selectedShiftForModal}
+          hasApplied={myApplications.includes(selectedShiftForModal.id)}
+          hasOverlap={
+            selectedShiftForModal.status === 'open' &&
+            checkOverlap(
+              parseISO(selectedShiftForModal.date_time),
+              Number(selectedShiftForModal.duration_hours) || 0,
+              selectedShiftForModal.id
+            )
+          }
+          onClose={() => setSelectedShiftForModal(null)}
         />
       )}
     </main>

@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession()
 
-  const protectedRoutes = ['/perfil', '/dashboard-clinica', '/dashboard-medico', '/publicar', '/super-admin-guardian']
+  const protectedRoutes = ['/perfil', '/dashboard-clinica', '/panel-clinica', '/dashboard-medico', '/publicar', '/super-admin-guardian']
   const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
 
   // Si no hay sesión y quiere entrar a un panel, lo mandamos al LOGIN

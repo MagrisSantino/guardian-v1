@@ -10,8 +10,9 @@ const HOUR_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 })
 
-const GUARDIA_DURATION_OPTIONS = [8, 12, 24] as const
-const CONSULTORIO_TIPO_OPTIONS = ['demanda', 'urgencias y emergencias', 'internado'] as const
+const SHIFT_CATEGORY_OPTIONS = ['Guardia', 'Consultorio', 'Ambulancia'] as const
+const SPECIALTY_OPTIONS = ['Generalista', 'Clínico', 'Pediatría', 'Gineco/obstetricia', 'Cirugía general', 'Traumatología', 'Cardiología', 'Urología', 'Otro'] as const
+const DURATION_PILLS = [4, 6, 8, 12, 24, 'Otro'] as const
 
 function getEndTime(start: string, durationHours: number): string {
   const [h, m] = start.split(':').map(Number)
@@ -22,15 +23,15 @@ function getEndTime(start: string, durationHours: number): string {
 }
 
 export default function PublicarModal({ onClose, onRefresh, selectedDate = null }: { onClose: () => void; onRefresh: () => void; selectedDate?: Date | null }) {
-  const [title, setTitle] = useState('')
-  const [shiftCategory, setShiftCategory] = useState<'Guardia' | 'Consultorio'>('Guardia')
-  const [specialty, setSpecialty] = useState('')
+  const [shiftCategory, setShiftCategory] = useState<'Guardia' | 'Consultorio' | 'Ambulancia'>('Guardia')
+  const [specialty, setSpecialty] = useState<string>('Generalista')
+  const [specialtyOther, setSpecialtyOther] = useState('')
   const [date, setDate] = useState('')
   const [timeStart, setTimeStart] = useState('08:00')
-  const [guardiaDurationHours, setGuardiaDurationHours] = useState<8 | 12 | 24>(24)
-  const [consultorioTipo, setConsultorioTipo] = useState<string>('demanda')
+  const [durationPreset, setDurationPreset] = useState<4 | 6 | 8 | 12 | 24 | 'Otro'>(8)
+  const [durationHoursCustom, setDurationHoursCustom] = useState('')
   const [price, setPrice] = useState('')
-  const [viaticosExtra, setViaticosExtra] = useState('')
+  const [viaticosExtra, setViaticosExtra] = useState<'Sí' | 'No'>('No')
   const [tiempoAPagar, setTiempoAPagar] = useState('')
   const [detallesAdicionales, setDetallesAdicionales] = useState('')
   const [loading, setLoading] = useState(false)
@@ -63,27 +64,33 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
     if (!isVerified) return; // Doble barrera
     setLoading(true)
 
+    const specialtyRequired = specialty === 'Otro' ? specialtyOther.trim() : specialty
+    if (!specialtyRequired) {
+      alert('Completá la especialidad requerida.')
+      setLoading(false)
+      return
+    }
+
     const { data: { session } } = await supabase.auth.getSession()
-    
-    // ACÁ ESTABA EL ERROR: Faltaba enviar el duration_hours
+    const durationHours = durationPreset === 'Otro'
+      ? (parseFloat(durationHoursCustom) || 0)
+      : durationPreset
+
     const dateTimeISO = `${date}T${timeStart}:00`
-    const durationHours = shiftCategory === 'Guardia' ? guardiaDurationHours : 0
+    const title = `${shiftCategory} de ${specialtyRequired}`
 
     const insertPayload: Record<string, unknown> = {
       clinic_id: session?.user.id,
       title,
       shift_category: shiftCategory,
-      specialty_required: specialty,
+      specialty_required: specialtyRequired,
       date_time: dateTimeISO,
       duration_hours: durationHours,
       price: parseFloat(price),
-      viaticos: viaticosExtra || null,
+      viaticos: viaticosExtra,
       payment_timeframe: tiempoAPagar || null,
       description: detallesAdicionales || null,
       status: 'open'
-    }
-    if (shiftCategory === 'Consultorio') {
-      insertPayload.consultorio_tipo = consultorioTipo || null
     }
 
     const { error } = await supabase.from('shifts').insert([insertPayload])
@@ -137,45 +144,67 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Tipo de Servicio</label>
               <select
                 value={shiftCategory}
-                onChange={e => setShiftCategory(e.target.value as 'Guardia' | 'Consultorio')}
+                onChange={e => setShiftCategory(e.target.value as 'Guardia' | 'Consultorio' | 'Ambulancia')}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900"
               >
-                <option value="Guardia">Guardia</option>
-                <option value="Consultorio">Consultorio</option>
+                {SHIFT_CATEGORY_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">Título de la Guardia</label>
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)} required placeholder="Ej: Guardia 24hs Pediatría" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
-            </div>
-            <div>
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Especialidad Requerida</label>
-              <input type="text" value={specialty} onChange={e => setSpecialty(e.target.value)} required placeholder="Ej: Pediatría" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
+              <select
+                value={specialty}
+                onChange={e => setSpecialty(e.target.value)}
+                required
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900"
+              >
+                {SPECIALTY_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              {specialty === 'Otro' && (
+                <input
+                  type="text"
+                  value={specialtyOther}
+                  onChange={e => setSpecialtyOther(e.target.value)}
+                  placeholder="Escribí la especialidad"
+                  className="mt-2 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Fecha</label>
               <input type="date" value={date} onChange={e => setDate(e.target.value)} required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900 text-sm" />
             </div>
-            {shiftCategory === 'Guardia' && (
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">Duración</label>
-                <select value={guardiaDurationHours} onChange={e => setGuardiaDurationHours(Number(e.target.value) as 8 | 12 | 24)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900">
-                  {GUARDIA_DURATION_OPTIONS.map((hr) => (
-                    <option key={hr} value={hr}>{hr} hs</option>
-                  ))}
-                </select>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">Duración (horas)</label>
+              <div className="flex flex-wrap gap-2">
+                {DURATION_PILLS.map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setDurationPreset(val)}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                      durationPreset === val ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {val === 'Otro' ? 'Otro' : `${val} hs`}
+                  </button>
+                ))}
               </div>
-            )}
-            {shiftCategory === 'Consultorio' && (
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">Tipo de consultorio</label>
-                <select value={consultorioTipo} onChange={e => setConsultorioTipo(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900">
-                  {CONSULTORIO_TIPO_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+              {durationPreset === 'Otro' && (
+                <input
+                  type="number"
+                  min={1}
+                  value={durationHoursCustom}
+                  onChange={e => setDurationHoursCustom(e.target.value)}
+                  placeholder="Horas"
+                  className="mt-2 w-full max-w-[120px] px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-semibold text-slate-900"
+                />
+              )}
+            </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Hora inicio</label>
               <div className="relative">
@@ -186,23 +215,37 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
                   ))}
                 </select>
               </div>
-              {shiftCategory === 'Guardia' && (
-                <p className="text-xs text-slate-500 mt-1.5">
-                  Termina a las {getEndTime(timeStart, guardiaDurationHours)}
-                </p>
-              )}
+              <p className="text-xs text-slate-500 mt-1.5">
+                Termina a las {getEndTime(timeStart, durationPreset === 'Otro' ? (parseFloat(durationHoursCustom) || 0) : durationPreset)}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Pago Ofrecido ($)</label>
               <input type="number" value={price} onChange={e => setPrice(e.target.value)} required min="0" placeholder="Ej: 150000" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">Viáticos extra</label>
-              <input type="text" value={viaticosExtra} onChange={e => setViaticosExtra(e.target.value)} placeholder="Ej. Pasajes hasta $50.000, o 'No incluye'" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">Viáticos</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViaticosExtra('Sí')}
+                  className={`flex-1 px-4 py-3 rounded-full text-sm font-semibold transition-colors ${viaticosExtra === 'Sí' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  Sí
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViaticosExtra('No')}
+                  className={`flex-1 px-4 py-3 rounded-full text-sm font-semibold transition-colors ${viaticosExtra === 'No' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  No
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1.5">A coordinar con el médico</p>
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Tiempo a pagar</label>
-              <input type="text" value={tiempoAPagar} onChange={e => setTiempoAPagar(e.target.value)} placeholder="Ej. Pago al finalizar, Del 1 al 10 del mes" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
+              <input type="number" value={tiempoAPagar} onChange={e => setTiempoAPagar(e.target.value)} min={0} placeholder="Cantidad de días a pagar" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900" />
             </div>
           </div>
 

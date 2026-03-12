@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { useLoadScript, Autocomplete } from '@react-google-maps/api'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   ArrowRight,
   Building2,
+  Calendar,
   Eye,
   EyeOff,
   FileText,
@@ -267,12 +269,70 @@ export default function RegistroPage() {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [matricula, setMatricula] = useState('')
+  const [birthDate, setBirthDate] = useState('')
   const [institutionName, setInstitutionName] = useState('')
   const [address, setAddress] = useState('')
+  const [adminName, setAdminName] = useState('')
+  const [cuit, setCuit] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
 
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [checkingSession, setCheckingSession] = useState(true)
   const router = useRouter()
+
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    libraries: ['places'],
+  })
+  const addressAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
+  const [clinicKmFromCba, setClinicKmFromCba] = useState<number | null>(null)
+
+  const CBA_CAPITAL = { lat: -31.4201, lng: -64.1888 }
+
+  function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371
+    const dLat = ((lat2 - lat1) * Math.PI) / 180
+    const dLon = ((lon2 - lon1) * Math.PI) / 180
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
+  const handleAddressLoad = (auto: google.maps.places.Autocomplete) => {
+    addressAutocompleteRef.current = auto
+  }
+
+  const handleAddressPlaceChanged = () => {
+    const auto = addressAutocompleteRef.current
+    if (!auto) return
+    const place = auto.getPlace()
+    if (place?.formatted_address) {
+      setAddress(place.formatted_address)
+    } else if (place?.name) {
+      setAddress(place.name)
+    }
+
+    const loc = place?.geometry?.location
+    if (loc) {
+      const lat = loc.lat()
+      const lng = loc.lng()
+      const d = haversineKm(lat, lng, CBA_CAPITAL.lat, CBA_CAPITAL.lng)
+      setClinicKmFromCba(Math.round(d))
+    }
+  }
+
+  function validatePassword(pwd: string): boolean {
+    if (pwd.length < 8) return false
+    if (!/[A-Z]/.test(pwd)) return false
+    if (!/\d/.test(pwd)) return false
+    return true
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -295,31 +355,54 @@ export default function RegistroPage() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     setLoading(true)
 
-    const { error } = await supabase.auth.signUp({
+    if (!validatePassword(password)) {
+      setError(
+        'La contraseña debe tener al menos 8 caracteres, una letra mayúscula y un número.'
+      )
+      setLoading(false)
+      return
+    }
+
+    const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          full_name: name,
+          // Médico: nombre personal. Clínica: razón social / nombre de la institución.
+          full_name: role === 'doctor' ? name : institutionName,
           role,
           dni: role === 'doctor' ? dni : null,
-          matricula: role === 'doctor' ? matricula : null,
-          phone: phone || null,
+          matricula: role === 'doctor' ? (matricula || null) : null,
+          birth_date: role === 'doctor' ? birthDate || null : null,
+          phone: role === 'doctor' ? (phone || null) : null,
+          // Datos específicos de prestador
           institution_name: role === 'clinic_admin' ? institutionName : null,
           address: role === 'clinic_admin' ? address : null,
+          admin_name: role === 'clinic_admin' ? adminName : null,
+          cuit: role === 'clinic_admin' ? cuit : null,
+          whatsapp: role === 'clinic_admin' ? whatsapp : null,
+          km_from_cba: role === 'clinic_admin' ? clinicKmFromCba : null,
         },
       },
     })
 
     setLoading(false)
-    if (error) {
-      alert(error.message)
-    } else {
-      alert('¡Cuenta creada con éxito! Por favor, iniciá sesión.')
-      router.push('/login')
+    if (signUpError) {
+      const msg = signUpError.message.toLowerCase()
+      if (msg.includes('dni') || msg.includes('matricula')) {
+        setError(
+          'El DNI o Matrícula ingresados ya se encuentran registrados en otra cuenta.'
+        )
+      } else {
+        setError(signUpError.message)
+      }
+      return
     }
+    alert('¡Cuenta creada con éxito! Por favor, iniciá sesión.')
+    router.push('/login')
   }
 
   function handleNext() {
@@ -382,43 +465,98 @@ export default function RegistroPage() {
 
                 {step === 2 && (
                   <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <FormInput
-                      id="fullName"
-                      label="Nombre Completo"
-                      icon={User}
-                      placeholder="Ingresa tu nombre completo"
-                      value={name}
-                      onChange={setName}
-                      required
-                    />
-                    <FormInput
-                      id="dni"
-                      label="DNI"
-                      icon={IdCard}
-                      placeholder="Sin puntos ni espacios"
-                      value={dni}
-                      onChange={setDni}
-                      required
-                    />
-                    <FormInput
-                      id="email"
-                      label="Email"
-                      icon={Mail}
-                      type="email"
-                      placeholder="tu@email.com"
-                      value={email}
-                      onChange={setEmail}
-                      required
-                    />
-                    <FormInput
-                      id="phone"
-                      label="Teléfono (opcional)"
-                      icon={Phone}
-                      type="tel"
-                      placeholder="11 1234 5678"
-                      value={phone}
-                      onChange={setPhone}
-                    />
+                    {role === 'doctor' ? (
+                      <>
+                        <FormInput
+                          id="fullName"
+                          label="Nombre Completo"
+                          icon={User}
+                          placeholder="Ingresa tu nombre completo"
+                          value={name}
+                          onChange={setName}
+                          required
+                        />
+                        <FormInput
+                          id="dni"
+                          label="DNI"
+                          icon={IdCard}
+                          placeholder="Sin puntos ni espacios"
+                          value={dni}
+                          onChange={setDni}
+                          required
+                        />
+                        <FormInput
+                          id="email"
+                          label="Email"
+                          icon={Mail}
+                          type="email"
+                          placeholder="tu@email.com"
+                          value={email}
+                          onChange={setEmail}
+                          required
+                        />
+                        <FormInput
+                          id="phone"
+                          label="Teléfono (opcional)"
+                          icon={Phone}
+                          type="tel"
+                          placeholder="11 1234 5678"
+                          value={phone}
+                          onChange={setPhone}
+                        />
+                        <FormInput
+                          id="birthDate"
+                          label="Fecha de Nacimiento"
+                          icon={Calendar}
+                          type="date"
+                          placeholder=""
+                          value={birthDate}
+                          onChange={setBirthDate}
+                          required
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <FormInput
+                          id="adminName"
+                          label="Nombre del Administrador"
+                          icon={User}
+                          placeholder="Nombre del administrador"
+                          value={adminName}
+                          onChange={setAdminName}
+                          required
+                        />
+                        <FormInput
+                          id="cuit"
+                          label="CUIT/CUIL"
+                          icon={IdCard}
+                          placeholder="Sin guiones"
+                          value={cuit}
+                          onChange={setCuit}
+                          required
+                        />
+                        <FormInput
+                          id="whatsapp"
+                          label="Teléfono de Contacto"
+                          icon={Phone}
+                          type="tel"
+                          placeholder="11 1234 5678"
+                          value={whatsapp}
+                          onChange={setWhatsapp}
+                          required
+                        />
+                        <FormInput
+                          id="email"
+                          label="Email"
+                          icon={Mail}
+                          type="email"
+                          placeholder="tu@email.com"
+                          value={email}
+                          onChange={setEmail}
+                          required
+                        />
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -432,7 +570,6 @@ export default function RegistroPage() {
                         placeholder="Ej: MP 1234"
                         value={matricula}
                         onChange={setMatricula}
-                        required
                       />
                     ) : (
                       <>
@@ -445,15 +582,41 @@ export default function RegistroPage() {
                           onChange={setInstitutionName}
                           required
                         />
-                        <FormInput
-                          id="direccion"
-                          label="Dirección"
-                          icon={MapPin}
-                          placeholder="Dirección del prestador"
-                          value={address}
-                          onChange={setAddress}
-                          required
-                        />
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor="direccion"
+                            className="block text-sm font-medium text-slate-700"
+                          >
+                            Dirección
+                          </label>
+                          <div className="relative">
+                            <MapPin className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            {!isLoaded ? (
+                              <input
+                                id="direccion"
+                                type="text"
+                                value="Cargando mapas..."
+                                disabled
+                                className="w-full rounded-xl border-0 bg-slate-100 py-3 pl-10 pr-3 text-sm text-slate-400 ring-1 ring-slate-200"
+                              />
+                            ) : (
+                              <Autocomplete
+                                onLoad={handleAddressLoad}
+                                onPlaceChanged={handleAddressPlaceChanged}
+                              >
+                                <input
+                                  id="direccion"
+                                  type="text"
+                                  placeholder="Dirección del prestador"
+                                  value={address}
+                                  onChange={(e) => setAddress(e.target.value)}
+                                  required
+                                  className="w-full rounded-xl border-0 bg-slate-50 py-3 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 ring-1 ring-slate-200 transition-all focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                />
+                              </Autocomplete>
+                            )}
+                          </div>
+                        </div>
                       </>
                     )}
 
@@ -469,11 +632,11 @@ export default function RegistroPage() {
                         <input
                           id="password"
                           type={showPassword ? 'text' : 'password'}
-                          placeholder="Minimo 6 caracteres"
+                          placeholder="Mín. 8 caracteres, una mayúscula y un número"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           required
-                          minLength={6}
+                          minLength={8}
                           className="w-full rounded-xl border-0 bg-slate-50 py-3 pl-10 pr-11 text-sm text-slate-900 placeholder:text-slate-400 ring-1 ring-slate-200 transition-all focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         />
                         <button
@@ -494,6 +657,15 @@ export default function RegistroPage() {
                         </button>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {error && (
+                  <div
+                    role="alert"
+                    className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                  >
+                    {error}
                   </div>
                 )}
 

@@ -23,6 +23,7 @@ import {
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useSearchParams, usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   ChevronLeft,
   ChevronRight,
@@ -35,11 +36,12 @@ import {
   UserCheck,
   CheckCircle2,
   Plus,
+  LayoutDashboard,
+  Activity,
+  ClipboardList,
+  Ambulance,
+  X,
 } from 'lucide-react'
-
-/* ─────────────────────────────────────────────
-   TYPES & STATUS (mapeo a lógica real: open/filled/completed + postulantes)
-   ───────────────────────────────────────────── */
 
 type GuardiaStatus = 'creada' | 'con_postulantes' | 'asignada' | 'finalizada'
 
@@ -90,7 +92,6 @@ const MONTHS_ES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ]
 
-/** Deriva el estado visual desde el shift real (BD + applicants) */
 function getGuardiaStatus(shift: any): GuardiaStatus {
   if (shift.status === 'completed') return 'finalizada'
   if (shift.status === 'filled') return 'asignada'
@@ -98,10 +99,6 @@ function getGuardiaStatus(shift: any): GuardiaStatus {
   if (shift.status === 'open' && pendingApps.length > 0) return 'con_postulantes'
   return 'creada'
 }
-
-/* ─────────────────────────────────────────────
-   SUB-COMPONENTS (UI only; datos inyectados por padre)
-   ───────────────────────────────────────────── */
 
 function StatusBadge({ status }: { status: GuardiaStatus }) {
   const config = STATUS_CONFIG[status]
@@ -126,7 +123,6 @@ function StatusLegend() {
   )
 }
 
-/** Desktop: tarjeta compacta dentro de la celda del calendario */
 function GuardiaCard({
   shift,
   onShiftClick,
@@ -176,7 +172,6 @@ function GuardiaCard({
   )
 }
 
-/** Mobile: tarjeta expandida en lista/semana */
 function GuardiaCardMobile({
   shift,
   onShiftClick,
@@ -259,10 +254,6 @@ function StatCard({
   )
 }
 
-/* ─────────────────────────────────────────────
-   MAIN CONTENT (toda la lógica de negocio existente)
-   ───────────────────────────────────────────── */
-
 function DashboardClinicaContent() {
   const [myShifts, setMyShifts] = useState<any[]>([])
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -274,6 +265,7 @@ function DashboardClinicaContent() {
   const [shiftToManage, setShiftToManage] = useState<any>(null)
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null)
   const [legendOpen, setLegendOpen] = useState(false)
+  const [selectedDayShifts, setSelectedDayShifts] = useState<any[] | null>(null)
 
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -328,6 +320,7 @@ function DashboardClinicaContent() {
 
   const handleShiftClick = (e: React.MouseEvent, shift: any) => {
     e.stopPropagation()
+    setSelectedDayShifts(null)
     setShiftToManage(shift)
     setIsPostulantesOpen(false)
     setIsVerGuardiaAsignadaOpen(false)
@@ -418,9 +411,15 @@ function DashboardClinicaContent() {
           <p className="text-xs text-slate-500 sm:text-sm">
             Gestiona y visualiza todas las guardias médicas del periodo
           </p>
+          <Link
+            href="/panel-clinica"
+            className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 mt-2"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Ver panel de ofertas
+          </Link>
         </div>
 
-        {/* Stats bar */}
         <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 sm:mb-8">
           <StatCard
             title="Total Guardias"
@@ -452,7 +451,6 @@ function DashboardClinicaContent() {
           />
         </div>
 
-        {/* Calendar section */}
         <div className="space-y-4 md:space-y-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-2 sm:gap-4">
@@ -508,7 +506,6 @@ function DashboardClinicaContent() {
             </div>
           </div>
 
-          {/* Mobile: mini mes + timeline por semana */}
           <div className="md:hidden">
             <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/80">
@@ -627,7 +624,6 @@ function DashboardClinicaContent() {
             </div>
           </div>
 
-          {/* Desktop: grilla 7 columnas */}
           <div className="hidden md:block">
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
               <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80">
@@ -645,18 +641,24 @@ function DashboardClinicaContent() {
               <div className="grid grid-cols-7">
                 {calendarDays.map((day, cellIndex) => {
                   const dateKey = format(day, 'yyyy-MM-dd')
-                  const guardias = guardiasByDate[dateKey] || []
+                  const dayShifts = guardiasByDate[dateKey] || []
                   const isCurrentMonth = isSameMonth(day, monthStart)
                   const dayOfWeek = day.getDay()
                   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
                   const isTodayCell = isCurrentMonth && isToday(day)
                   const isLastInRow = cellIndex % 7 === 6
+                  const hasGuardias = dayShifts.length > 0
+
+                  const handleCellClick = () => {
+                    if (hasGuardias) setSelectedDayShifts(dayShifts)
+                    else handleDayClick(day)
+                  }
 
                   return (
                     <div
                       key={dateKey}
-                      onClick={() => handleDayClick(day)}
-                      className={`group relative min-h-[110px] border-b border-slate-100 p-2 transition-colors duration-200 hover:bg-blue-500/5 cursor-pointer lg:min-h-[130px] ${!isLastInRow ? 'border-r border-slate-100' : ''} ${isWeekend ? 'bg-slate-50/50' : ''}`}
+                      onClick={handleCellClick}
+                      className={`group relative min-h-[110px] border-b border-slate-100 p-2 transition-colors duration-200 cursor-pointer lg:min-h-[130px] ${!isLastInRow ? 'border-r border-slate-100' : ''} ${isWeekend ? 'bg-slate-50/50' : ''} ${hasGuardias ? 'hover:bg-slate-50' : 'hover:bg-blue-500/5'}`}
                     >
                       <div className="mb-1.5 flex items-start">
                         <span
@@ -672,9 +674,27 @@ function DashboardClinicaContent() {
                         </span>
                       </div>
                       <div className="space-y-1.5">
-                        {guardias.map((shift) => (
-                          <GuardiaCard key={shift.id} shift={shift} onShiftClick={handleShiftClick} />
-                        ))}
+                        {dayShifts.length <= 2 ? (
+                          dayShifts.map((shift) => (
+                            <div key={shift.id} onClick={(e) => { e.stopPropagation(); handleShiftClick(e, shift); }}>
+                              <GuardiaCard shift={shift} onShiftClick={handleShiftClick} />
+                            </div>
+                          ))
+                        ) : (
+                          <div className="flex flex-wrap gap-1 mt-1 justify-center">
+                            {dayShifts.map((shift) => {
+                              const status = getGuardiaStatus(shift)
+                              const config = STATUS_CONFIG[status]
+                              const category = shift.shift_category || 'Guardia'
+                              const CategoryIcon = category === 'Guardia' ? Activity : category === 'Consultorio' ? ClipboardList : Ambulance
+                              return (
+                                <span key={shift.id} className={config.textClass}>
+                                  <CategoryIcon className="h-4 w-4" />
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )
@@ -683,7 +703,6 @@ function DashboardClinicaContent() {
             </div>
           </div>
 
-          {/* FAB Crear Guardia (mobile) */}
           <div className="fixed right-4 bottom-6 z-40 md:hidden">
             <button
               type="button"
@@ -697,6 +716,33 @@ function DashboardClinicaContent() {
         </div>
       </div>
 
+      {selectedDayShifts != null && selectedDayShifts.length > 0 && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
+              <h3 className="text-lg font-bold text-slate-900">
+                Guardias del {format(parseISO(selectedDayShifts[0].date_time), "d 'de' MMMM", { locale: es })}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedDayShifts(null)}
+                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                aria-label="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-3 flex-1 min-h-0">
+              {selectedDayShifts.map((shift) => (
+                <div key={shift.id}>
+                  <GuardiaCardMobile shift={shift} onShiftClick={handleShiftClick} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {isPublicarOpen && (
         <PublicarModal
           onClose={() => setIsPublicarOpen(false)}
@@ -704,7 +750,7 @@ function DashboardClinicaContent() {
           selectedDate={selectedDateForModal}
         />
       )}
-      {isPostulantesOpen && (
+      {isPostulantesOpen && shiftToManage && (
         <VerPostulantesModal
           onClose={() => setIsPostulantesOpen(false)}
           onRefresh={fetchMyShifts}

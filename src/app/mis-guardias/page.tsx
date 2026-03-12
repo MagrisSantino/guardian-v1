@@ -7,35 +7,40 @@ import { supabase } from '@/lib/supabase'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { CalendarDays, CheckCircle2 } from 'lucide-react'
+import DetalleGuardiaMedicoModal from '@/components/DetalleGuardiaMedicoModal'
 
 export default function MisGuardiasPage() {
   const [myGuardias, setMyGuardias] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedShift, setSelectedShift] = useState<any | null>(null)
+  const [selectedUserStatus, setSelectedUserStatus] = useState<'confirmado' | 'completada' | ''>('')
   const router = useRouter()
 
-  useEffect(() => {
-    async function fetchMyGuardias() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/login')
-        return
-      }
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
-      if (profile?.role !== 'doctor') {
-        router.push('/dashboard-medico')
-        return
-      }
-      const { data } = await supabase
-        .from('shifts')
-        .select('*, clinic:profiles!clinic_id(full_name)')
-        .eq('professional_id', session.user.id)
-        .in('status', ['filled', 'completed'])
-        .order('date_time', { ascending: true })
-      setMyGuardias(data || [])
-      setLoading(false)
+  async function fetchMyGuardias() {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/login')
+      return
     }
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+    if (profile?.role !== 'doctor') {
+      router.push('/dashboard-medico')
+      return
+    }
+    const { data } = await supabase
+      .from('shifts')
+      .select('*, clinic:profiles!clinic_id(full_name)')
+      .eq('professional_id', session.user.id)
+      .in('status', ['filled', 'completed'])
+      .order('date_time', { ascending: true })
+    setMyGuardias(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => {
     fetchMyGuardias()
-  }, [router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const guardiasPorHacer = myGuardias.filter(s => s.status === 'filled')
   const guardiasTerminadas = myGuardias.filter(s => s.status === 'completed')
@@ -85,17 +90,32 @@ export default function MisGuardiasPage() {
                 const d = parseISO(g.date_time)
                 const isCompleted = g.status === 'completed'
                 return (
-                  <li key={g.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-slate-50/50 transition-colors">
+                  <li
+                    key={g.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setSelectedShift(g)
+                      setSelectedUserStatus(isCompleted ? 'completada' : 'confirmado')
+                    }}
+                  >
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-900 truncate">{g.title}</p>
                       <p className="text-sm text-slate-500">{g.clinic?.full_name || 'Prestador'}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">{format(d, "EEEE d MMM", { locale: es })} · {format(d, 'HH:mm')}hs</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {format(d, "EEEE d MMM", { locale: es })} · {format(d, 'HH:mm')}hs
+                      </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${isCompleted ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-800'}`}>
+                      <span
+                        className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
+                          isCompleted ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
                         {isCompleted ? 'Terminada' : 'Por hacer'}
                       </span>
-                      <span className="text-sm font-bold text-emerald-600">${Number(g.price).toLocaleString()}</span>
+                      <span className="text-sm font-bold text-emerald-600">
+                        ${Number(g.price).toLocaleString()}
+                      </span>
                     </div>
                   </li>
                 )
@@ -113,6 +133,17 @@ export default function MisGuardiasPage() {
           </div>
         )}
       </div>
+
+      {selectedShift && (
+        <DetalleGuardiaMedicoModal
+          shift={selectedShift}
+          userStatus={selectedUserStatus}
+          hasOverlap={false}
+          onClose={() => setSelectedShift(null)}
+          onRefresh={fetchMyGuardias}
+        />
+      )}
     </main>
   )
 }
+

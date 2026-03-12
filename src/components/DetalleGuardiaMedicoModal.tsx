@@ -130,6 +130,9 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     setLoading(false)
   }
 
+  const location = shift.clinic?.location_maps || shift.clinic?.address || 'Ubicación no especificada'
+  const shiftDate = new Date(shift.date_time)
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
       <div className="bg-white border border-slate-200 p-6 md:p-8 rounded-3xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200 relative overflow-hidden">
@@ -152,10 +155,19 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
             </div>
           </div>
           <h3 className="text-lg font-bold text-slate-800 mt-5 leading-snug">{shift.title}</h3>
+          <p className="mt-2 text-sm text-slate-600 flex items-start gap-2">
+            <span className="text-lg">📍</span>
+            <span>{location} a 0km de Córdoba Capital</span>
+          </p>
           <div className="flex items-center justify-between mt-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <p className="text-slate-700 font-bold text-sm flex items-center gap-2">
-              <span className="text-lg">📅</span> {format(new Date(shift.date_time), 'dd/MM/yyyy HH:mm')}hs
-            </p>
+            <div className="flex flex-col gap-1">
+              <p className="text-slate-700 font-bold text-sm flex items-center gap-2">
+                <span className="text-lg">📅</span> {format(shiftDate, 'dd/MM/yyyy')}
+              </p>
+              <p className="text-slate-600 text-xs font-medium ml-7">
+                Hora inicio: {format(shiftDate, 'HH:mm')}hs
+              </p>
+            </div>
             <p className="text-emerald-600 font-black text-xl">${(shift.price / 1000)}k</p>
           </div>
         </div>

@@ -87,7 +87,7 @@ function LoginForm({
     <form onSubmit={onSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-[13px] font-semibold text-slate-700">
-          Email Corporativo
+          Correo electrónico
         </label>
         <div className="relative">
           <div className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-slate-400">

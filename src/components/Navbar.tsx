@@ -99,11 +99,14 @@ export default function Navbar() {
 
   const handleNotificationClick = async (notif: any) => {
     setShowNotifications(false);
-    
+
     if (!notif.is_read) {
       await supabase.from('notifications').update({ is_read: true }).eq('id', notif.id)
       setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n))
     }
+
+    // "Guardia Cubierta" es solo informativa: no abrir calendario ni modal de postulación
+    if (notif.title === 'Guardia Cubierta') return
 
     if (notif.shift_id) {
       if (role === 'doctor') router.push(`/calendario-medico?shiftId=${notif.shift_id}`)
@@ -161,15 +164,15 @@ export default function Navbar() {
               {role === 'clinic_admin' && (
                 <>
                   <Link
-                    href="/dashboard-clinica"
-                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname === '/dashboard-clinica' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+                    href="/panel-clinica"
+                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname === '/panel-clinica' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
                   >
                     <LayoutDashboard className="h-4 w-4" />
                     Panel
                   </Link>
                   <Link
                     href="/dashboard-clinica"
-                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname === '/dashboard-clinica' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname === '/dashboard-clinica' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
                   >
                     <Calendar className="h-4 w-4" />
                     Calendario
@@ -250,7 +253,7 @@ export default function Navbar() {
                             <div
                               key={notif.id}
                               onClick={() => handleNotificationClick(notif)}
-                              className={`px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer ${notif.is_read ? 'opacity-75' : 'bg-blue-50/30'}`}
+                              className={`px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer ${notif.is_read ? 'opacity-75' : 'bg-blue-50/30'} ${notif.title === 'Guardia Cubierta' ? 'cursor-default hover:bg-transparent' : ''}`}
                             >
                               <p className="text-xs font-bold text-slate-900 mb-0.5">{notif.title}</p>
                               <p className="text-xs text-slate-600 leading-snug">{notif.message}</p>
@@ -362,11 +365,11 @@ export default function Navbar() {
                     )}
                     {role === 'clinic_admin' && (
                       <>
-                        <Link href="/dashboard-clinica" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/dashboard-clinica' ? 'bg-blue-50 font-medium text-blue-700' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
+                        <Link href="/panel-clinica" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/panel-clinica' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
                           <LayoutDashboard className="h-4 w-4" />
                           Panel
                         </Link>
-                        <Link href="/dashboard-clinica" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/dashboard-clinica' ? 'bg-blue-50 font-medium text-blue-700' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
+                        <Link href="/dashboard-clinica" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/dashboard-clinica' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
                           <Calendar className="h-4 w-4" />
                           Calendario
                         </Link>
