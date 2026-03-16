@@ -274,8 +274,6 @@ export default function RegistroPage() {
   const [address, setAddress] = useState('')
   const [adminName, setAdminName] = useState('')
   const [cuit, setCuit] = useState('')
-  const [whatsapp, setWhatsapp] = useState('')
-
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [checkingSession, setCheckingSession] = useState(true)
@@ -371,20 +369,14 @@ export default function RegistroPage() {
       password,
       options: {
         data: {
-          // Médico: nombre personal. Clínica: razón social / nombre de la institución.
-          full_name: role === 'doctor' ? name : institutionName,
+          full_name: role === 'clinic_admin' ? institutionName : name,
+          admin_name: role === 'clinic_admin' ? adminName : null,
+          whatsapp: phone || null,
+          location_maps: role === 'clinic_admin' ? address : null,
           role,
           dni: role === 'doctor' ? dni : null,
           matricula: role === 'doctor' ? (matricula || null) : null,
           birth_date: role === 'doctor' ? birthDate || null : null,
-          phone: role === 'doctor' ? (phone || null) : null,
-          // Datos específicos de prestador
-          institution_name: role === 'clinic_admin' ? institutionName : null,
-          address: role === 'clinic_admin' ? address : null,
-          admin_name: role === 'clinic_admin' ? adminName : null,
-          cuit: role === 'clinic_admin' ? cuit : null,
-          whatsapp: role === 'clinic_admin' ? whatsapp : null,
-          km_from_cba: role === 'clinic_admin' ? clinicKmFromCba : null,
         },
       },
     })
@@ -541,8 +533,8 @@ export default function RegistroPage() {
                           icon={Phone}
                           type="tel"
                           placeholder="11 1234 5678"
-                          value={whatsapp}
-                          onChange={setWhatsapp}
+                          value={phone}
+                          onChange={setPhone}
                           required
                         />
                         <FormInput

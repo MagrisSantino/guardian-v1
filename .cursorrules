@@ -17,16 +17,20 @@ ESTRICTO: Nunca inventes nombres de columnas. Usa ÚNICAMENTE las columnas lista
 - `specialty` (text)
 - `avatar_url` (text) - Foto de perfil / Logo prestador
 - `cover_url` (text) - Foto de portada
-- `age` (integer)
 - `bio` (text)
 - `experience_tags` (text[])
-- `whatsapp` (text) - Número de contacto
+- `whatsapp` (text) - Número de contacto unificado
 - `prestador_type` (text)
-- `location_maps` (text)
+- `location_maps` (text) - Dirección física
 - `km_from_cba` (integer)
 - `complexity` (text[])
 - `resources` (text[])
 - `services` (text[])
+- `blocked_dates` (text[])
+- `rating` (numeric)
+- `reviews_count` (integer)
+- `created_at` (timestamp)
+- `updated_at` (timestamp)
 
 ### 2. Tabla: `shifts` (Guardias u Ofertas)
 - `id` (uuid, primary key)
@@ -37,17 +41,37 @@ ESTRICTO: Nunca inventes nombres de columnas. Usa ÚNICAMENTE las columnas lista
 - `duration_hours` (integer)
 - `price` (numeric/integer)
 - `status` (text: 'open', 'filled', 'completed')
-- `shift_category` (text)
+- `shift_category` (text) - 'Guardia', 'Consultorio', 'Ambulancia'
 - `viaticos` (text)
 - `payment_timeframe` (text)
 - `description` (text)
 - `professional_id` (uuid, foreign key a profiles.id)
+- `created_at` (timestamp)
 
 ### 3. Tabla: `shift_applications` (Postulaciones)
 - `id` (uuid, primary key)
 - `shift_id` (uuid, foreign key a shifts.id)
 - `professional_id` (uuid, foreign key a profiles.id)
 - `status` (text: 'pending', 'accepted', 'rejected')
+- `created_at` (timestamp)
+
+### 4. Tabla: `reviews` (Reseñas)
+- `id` (uuid, primary key)
+- `shift_id` (uuid, foreign key a shifts.id)
+- `reviewer_id` (uuid, foreign key a profiles.id)
+- `reviewed_id` (uuid, foreign key a profiles.id)
+- `rating` (integer)
+- `comment` (text)
+- `created_at` (timestamp)
+
+### 5. Tabla: `notifications` (Notificaciones)
+- `id` (uuid, primary key)
+- `user_id` (uuid, foreign key a profiles.id)
+- `shift_id` (uuid, foreign key a shifts.id)
+- `title` (text)
+- `message` (text)
+- `is_read` (boolean)
+- `created_at` (timestamp)
 
 ## REGLAS DE DISEÑO
 - Usa Tailwind CSS.

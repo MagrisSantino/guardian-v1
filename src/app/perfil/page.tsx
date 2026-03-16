@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { useLoadScript, Autocomplete } from '@react-google-maps/api'
 import { BadgeCheck, AlertCircle, LogOut, Save, User, Camera, Loader2, Trash } from 'lucide-react'
 
 export default function Perfil() {
@@ -29,8 +30,6 @@ export default function Perfil() {
   const [providerTypeOther, setProviderTypeOther] = useState('')
   const [institutionDescription, setInstitutionDescription] = useState('')
   const [address, setAddress] = useState('')
-  const [provincia, setProvincia] = useState('')
-  const [localidad, setLocalidad] = useState('')
   const [complexityTags, setComplexityTags] = useState<string[]>([])
   const [resourceTags, setResourceTags] = useState<string[]>([])
   const [numDoctors, setNumDoctors] = useState<string>('')
@@ -44,6 +43,50 @@ export default function Perfil() {
   const COMPLEXITY_OPTIONS = ['UTI', 'UCI', 'Internado', 'Consultorio', 'Guardia'] as const
   const RESOURCE_OPTIONS = ['Rx', 'Laboratorio', 'Cocina', 'Habitación/es'] as const
   const router = useRouter()
+
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    libraries: ['places'],
+  })
+  const addressAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
+
+  const CBA_CAPITAL = { lat: -31.4201, lng: -64.1888 }
+
+  function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371
+    const dLat = ((lat2 - lat1) * Math.PI) / 180
+    const dLon = ((lon2 - lon1) * Math.PI) / 180
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
+  const handleAddressLoad = (auto: google.maps.places.Autocomplete) => {
+    addressAutocompleteRef.current = auto
+  }
+
+  const handleAddressPlaceChanged = () => {
+    const auto = addressAutocompleteRef.current
+    if (!auto) return
+    const place = auto.getPlace()
+    if (place?.formatted_address) {
+      setAddress(place.formatted_address)
+    } else if (place?.name) {
+      setAddress(place.name || '')
+    }
+    const loc = place?.geometry?.location
+    if (loc) {
+      const lat = loc.lat()
+      const lng = loc.lng()
+      const d = haversineKm(lat, lng, CBA_CAPITAL.lat, CBA_CAPITAL.lng)
+      setKmFromCba(Math.round(d))
+    }
+  }
 
   useEffect(() => {
     fetchProfile()
@@ -126,16 +169,7 @@ export default function Perfil() {
         }
         setInstitutionDescription(data.bio ?? '')
         const loc = data.location_maps || meta.location_maps || ''
-        if (loc) {
-          const parts = loc.split(',').map((s: string) => s.trim())
-          setAddress(parts[0] || '')
-          setLocalidad(parts[1] || '')
-          setProvincia(parts[2] || '')
-        } else {
-          setAddress(meta.address || '')
-          setLocalidad(meta.localidad || '')
-          setProvincia(meta.provincia || '')
-        }
+        if (loc) setAddress(loc)
         setContactWhatsapp(data.whatsapp || meta.whatsapp || '')
         setNumDoctors(data.num_doctors != null ? String(data.num_doctors) : '')
         setNumNurses(data.num_nurses != null ? String(data.num_nurses) : '')
@@ -248,7 +282,7 @@ export default function Perfil() {
           full_name: fullName,
           prestador_type: providerType === 'Otro' ? providerTypeOther : providerType,
           bio: institutionDescription || null,
-          location_maps: [address, localidad, provincia].filter(Boolean).join(', ') || null,
+          location_maps: address || null,
           whatsapp: contactWhatsapp || null,
           complexity: complexityTags,
           resources: resourceTags,
@@ -720,33 +754,27 @@ export default function Perfil() {
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-slate-700 mb-1.5">Dirección</label>
-                  <input
-                    type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all text-slate-900 font-semibold"
-                    placeholder="Dirección del prestador"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Provincia</label>
-                  <input
-                    type="text"
-                    value={provincia}
-                    onChange={(e) => setProvincia(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all text-slate-900 font-semibold"
-                    placeholder="Ej: Córdoba"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Localidad</label>
-                  <input
-                    type="text"
-                    value={localidad}
-                    onChange={(e) => setLocalidad(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all text-slate-900 font-semibold"
-                    placeholder="Ej: Córdoba Capital"
-                  />
+                  {!isLoaded ? (
+                    <input
+                      type="text"
+                      value="Cargando mapas..."
+                      disabled
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-400 font-semibold"
+                    />
+                  ) : (
+                    <Autocomplete
+                      onLoad={handleAddressLoad}
+                      onPlaceChanged={handleAddressPlaceChanged}
+                    >
+                      <input
+                        type="text"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all text-slate-900 font-semibold"
+                        placeholder="Dirección del prestador"
+                      />
+                    </Autocomplete>
+                  )}
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-slate-700 mb-1.5">WhatsApp / Teléfono de contacto</label>
