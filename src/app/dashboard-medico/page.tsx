@@ -220,6 +220,7 @@ export default function DashboardMedico() {
                   shift={shift}
                   viewMode={viewMode}
                   hasApplied={hasApplied}
+                  isConfirmed={myConfirmedShifts.some(c => c.id === shift.id)}
                   hasOverlap={hasOverlap}
                   onClick={() => setSelectedShift(shift)}
                 />

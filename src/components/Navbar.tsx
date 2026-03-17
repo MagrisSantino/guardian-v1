@@ -12,6 +12,7 @@ export default function Navbar() {
   const [profileName, setProfileName] = useState<string | null>(null)
   const [isVerified, setIsVerified] = useState<boolean | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [profileWhatsapp, setProfileWhatsapp] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -36,11 +37,12 @@ export default function Navbar() {
       const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user || null)
       if (session?.user) {
-        const { data } = await supabase.from('profiles').select('role, full_name, is_verified, avatar_url').eq('id', session.user.id).single()
+        const { data } = await supabase.from('profiles').select('role, full_name, is_verified, avatar_url, whatsapp').eq('id', session.user.id).single()
         setRole(data?.role ?? null)
         setProfileName(data?.full_name ?? null)
         setIsVerified(data?.is_verified ?? null)
         setAvatarUrl(data?.avatar_url ?? null)
+        setProfileWhatsapp(data?.whatsapp ?? null)
         fetchNotifications(session.user.id)
       }
     }
@@ -49,11 +51,12 @@ export default function Navbar() {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null)
       if (session?.user) {
-        supabase.from('profiles').select('role, full_name, is_verified, avatar_url').eq('id', session.user.id).single().then(({ data }) => {
+        supabase.from('profiles').select('role, full_name, is_verified, avatar_url, whatsapp').eq('id', session.user.id).single().then(({ data }) => {
           setRole(data?.role ?? null)
           setProfileName(data?.full_name ?? null)
           setIsVerified(data?.is_verified ?? null)
           setAvatarUrl(data?.avatar_url ?? null)
+          setProfileWhatsapp(data?.whatsapp ?? null)
         })
         fetchNotifications(session.user.id)
       } else {
@@ -61,6 +64,7 @@ export default function Navbar() {
         setProfileName(null)
         setIsVerified(null)
         setAvatarUrl(null)
+        setProfileWhatsapp(null)
         setNotifications([])
       }
     })
@@ -177,6 +181,16 @@ export default function Navbar() {
                     <Calendar className="h-4 w-4" />
                     Calendario
                   </Link>
+                  <Link
+                    href="/perfil"
+                    className={`relative inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname === '/perfil' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+                  >
+                    <User className="h-4 w-4" />
+                    Mi Perfil
+                    {isVerified === false && (
+                      <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-hidden />
+                    )}
+                  </Link>
                 </>
               )}
               {role === 'doctor' && (
@@ -201,6 +215,16 @@ export default function Navbar() {
                   >
                     <CalendarCheck className="h-4 w-4" />
                     Mis guardias
+                  </Link>
+                  <Link
+                    href="/perfil"
+                    className={`relative inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname === '/perfil' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+                  >
+                    <User className="h-4 w-4" />
+                    Mi Perfil
+                    {(isVerified === false || !profileWhatsapp) && (
+                      <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-hidden />
+                    )}
                   </Link>
                 </>
               )}
@@ -286,18 +310,6 @@ export default function Navbar() {
                   </button>
                   {showUserMenu && (
                     <div className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-xl z-50">
-                      <Link
-                        href="/perfil"
-                        onClick={() => setShowUserMenu(false)}
-                        className="relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                      >
-                        <User className="h-4 w-4" />
-                        Mi Perfil
-                        {isVerified === false && (
-                          <span className="absolute -top-1 -right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-hidden />
-                        )}
-                      </Link>
-                      <div className="my-1 h-px bg-slate-100" />
                       <button
                         type="button"
                         onClick={() => { setShowUserMenu(false); handleLogout(); }}
@@ -373,6 +385,13 @@ export default function Navbar() {
                           <Calendar className="h-4 w-4" />
                           Calendario
                         </Link>
+                        <Link href="/perfil" className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/perfil' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
+                          <User className="h-4 w-4" />
+                          Mi Perfil
+                          {isVerified === false && (
+                            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-hidden />
+                          )}
+                        </Link>
                       </>
                     )}
                     {role === 'doctor' && (
@@ -394,7 +413,7 @@ export default function Navbar() {
                     <Link href="/perfil" className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/perfil' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
                       <User className="h-4 w-4" />
                       Mi Perfil
-                      {isVerified === false && (
+                      {(isVerified === false || (role === 'doctor' && !profileWhatsapp)) && (
                         <span className="absolute -top-1 -right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-hidden />
                       )}
                     </Link>

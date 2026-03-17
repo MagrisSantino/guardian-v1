@@ -4,22 +4,22 @@ const testimonials = [
   {
     quote:
       "Por fin una plataforma seria para cubrir guardias. Sin grupos de WhatsApp ni llamadas perdidas. Guardian cumple.",
-    author: "Dra. María L.",
-    role: "Médica general",
+    author: "Dr. Nicolas Roncaglia",
+    role: "Médico de Guardia",
     rating: 5,
   },
   {
     quote:
-      "Como clínica nos simplificó mucho la búsqueda de reemplazos. Los perfiles verificados nos dan tranquilidad.",
-    author: "Clínica Sanatorio del Sur",
-    role: "Institución",
+      "Como coordinadora nos simplificó mucho la búsqueda de reemplazos. Los perfiles verificados nos dan tranquilidad.",
+    author: "Ileana (Coordinadora)",
+    role: "Coordinadora de Guardias",
     rating: 5,
   },
   {
     quote:
       "La calificación mutua hace que todos se comprometan. Se nota la diferencia con otros sistemas.",
-    author: "Dr. Pablo R.",
-    role: "Emergentólogo",
+    author: "Dra. Macarena Zeballo",
+    role: "Emergentóloga",
     rating: 5,
   },
 ]

@@ -262,6 +262,8 @@ export default function RegistroPage() {
   const [step, setStep] = useState(1)
   const [role, setRole] = useState<Role>('doctor')
   const [showPassword, setShowPassword] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [name, setName] = useState('')
   const [dni, setDni] = useState('')
@@ -355,6 +357,12 @@ export default function RegistroPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
+
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden.')
+      setLoading(false)
+      return
+    }
 
     if (!validatePassword(password)) {
       setError(
@@ -617,7 +625,7 @@ export default function RegistroPage() {
                         htmlFor="password"
                         className="block text-sm font-medium text-slate-700 mb-1.5"
                       >
-                        Contrasena
+                        Contraseña
                       </label>
                       <div className="relative">
                         <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -635,11 +643,7 @@ export default function RegistroPage() {
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                          aria-label={
-                            showPassword
-                              ? 'Ocultar contrasena'
-                              : 'Mostrar contrasena'
-                          }
+                          aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                         >
                           {showPassword ? (
                             <EyeOff className="h-4 w-4" />
@@ -648,6 +652,50 @@ export default function RegistroPage() {
                           )}
                         </button>
                       </div>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="confirmPassword"
+                        className="block text-sm font-medium text-slate-700 mb-1.5"
+                      >
+                        Confirmar Contraseña
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          placeholder="Repetí tu contraseña"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          required
+                          minLength={8}
+                          className={cn(
+                            'w-full rounded-xl border-0 py-3 pl-10 pr-11 text-sm text-slate-900 placeholder:text-slate-400 ring-1 transition-all focus:ring-2 focus:outline-none',
+                            confirmPassword && password !== confirmPassword
+                              ? 'bg-red-50 ring-red-300 focus:ring-red-500 focus:bg-red-50'
+                              : 'bg-slate-50 ring-slate-200 focus:bg-white focus:ring-blue-500'
+                          )}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                          aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      {confirmPassword && password !== confirmPassword && (
+                        <p className="mt-1.5 text-xs text-red-600 font-medium">
+                          Las contraseñas no coinciden.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

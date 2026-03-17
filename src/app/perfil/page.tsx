@@ -11,10 +11,13 @@ export default function Perfil() {
   const [dni, setDni] = useState('')
   const [matricula, setMatricula] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  const [university, setUniversity] = useState('')
   const [bio, setBio] = useState('')
   const [birthDate, setBirthDate] = useState<string>('')
   const [specialtiesList, setSpecialtiesList] = useState<{ name: string; matricula: string }[]>([])
   const [experienceList, setExperienceList] = useState<{ place: string; time: string }[]>([])
+  // Flag: el profesional verificado modifico sus especialidades -> requiere nueva revision
+  const [specialtiesModified, setSpecialtiesModified] = useState(false)
   
   // Nuevos estados para la foto de perfil
   const [avatarUrl, setAvatarUrl] = useState<string>('')
@@ -114,6 +117,7 @@ export default function Perfil() {
       setAvatarUrl(data.avatar_url || '')
       setCoverUrl(data.cover_url || '')
       setKmFromCba((data as any).km_from_cba ?? null)
+      setUniversity((data as any).university || meta.university || '')
 
       // Backfill: si el perfil no tiene birth_date pero el user_metadata sí,
       // lo sincronizamos a la tabla profiles para que las clínicas vean la edad.
@@ -266,17 +270,24 @@ export default function Perfil() {
 
   async function handleSave() {
     setSaving(true)
+
+    // Si era verificado y modifico especialidades -> revocar verificacion automaticamente
+    const wasVerified = profile?.is_verified === true
+    const needsReverification = wasVerified && specialtiesModified && profile.role === 'doctor'
+
     const updateData = profile.role === 'doctor'
-      ? { 
-          full_name: fullName, 
-          dni, 
-          matricula, 
+      ? {
+          full_name: fullName,
+          dni,
+          matricula,
+          university: university || null,
           specialty: specialtiesList.length ? JSON.stringify(specialtiesList) : null,
-          whatsapp: whatsapp || null, 
-          bio: bio || null, 
+          whatsapp: whatsapp || null,
+          bio: bio || null,
           experience_tags: experienceList.map((exp) => `${exp.place} | ${exp.time}`),
           avatar_url: avatarUrl,
           cover_url: coverUrl,
+          ...(needsReverification ? { is_verified: false } : {}),
         }
       : {
           full_name: fullName,
@@ -287,6 +298,8 @@ export default function Perfil() {
           complexity: complexityTags,
           resources: resourceTags,
           services: serviceTags,
+          num_doctors: numDoctors !== '' ? Number(numDoctors) : null,
+          num_nurses: numNurses !== '' ? Number(numNurses) : null,
           avatar_url: avatarUrl,
           cover_url: coverUrl,
           km_from_cba: kmFromCba,
@@ -295,8 +308,15 @@ export default function Perfil() {
     const { error } = await supabase.from('profiles').update(updateData).eq('id', profile.id)
     setSaving(false)
     if (!error) {
-      alert('Perfil actualizado correctamente')
-      fetchProfile() 
+      if (needsReverification) {
+        alert(
+          'Perfil guardado.\n\nDebido a que modificaste tus especialidades, tu verificacion fue revocada automaticamente.\nNuestro equipo revisara los cambios y te otorgara el Tilde Azul nuevamente a la brevedad.'
+        )
+      } else {
+        alert('Perfil actualizado correctamente')
+      }
+      setSpecialtiesModified(false)
+      fetchProfile()
     } else {
       alert('Error al guardar: ' + error.message)
     }
@@ -536,6 +556,20 @@ export default function Perfil() {
               </div>
 
               <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                  Universidad de Egreso <span className="text-blue-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={university}
+                  onChange={(e) => setUniversity(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all text-slate-900 font-semibold"
+                  placeholder="Ej: Universidad Nacional de Córdoba"
+                />
+                <p className="text-xs text-slate-500 mt-1">Visible para las clínicas al revisar tu perfil</p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1.5">Matrícula (MP/MN)</label>
                 <input 
                   type="text" 
@@ -552,9 +586,10 @@ export default function Perfil() {
                   <label className="block text-sm font-bold text-slate-700">Especialidades</label>
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
                       setSpecialtiesList((prev) => [...prev, { name: '', matricula: '' }])
-                    }
+                      if (isVerified) setSpecialtiesModified(true)
+                    }}
                     className="text-xs font-semibold text-blue-600 hover:text-blue-700"
                   >
                     + Agregar especialidad
@@ -562,8 +597,16 @@ export default function Perfil() {
                 </div>
                 {specialtiesList.length === 0 && (
                   <p className="text-xs text-slate-400 mb-2">
-                    Podés cargar tus especialidades con su matrícula correspondiente.
+                    Podes cargar tus especialidades con su matricula correspondiente.
                   </p>
+                )}
+                {isVerified && specialtiesModified && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 mb-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                    <p>
+                      <strong>Atencion:</strong> Al guardar, tu perfil quedara <strong>pendiente de reverificacion</strong>. Nuestro equipo lo revisara a la brevedad y te devolvera el Tilde Azul.
+                    </p>
+                  </div>
                 )}
                 <div className="space-y-3">
                   {specialtiesList.map((spec, index) => (
@@ -581,6 +624,7 @@ export default function Perfil() {
                               i === index ? { ...item, name: value } : item
                             )
                           )
+                          if (isVerified) setSpecialtiesModified(true)
                         }}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm text-slate-900"
                         placeholder="Especialidad (ej: Pediatría)"
@@ -595,17 +639,19 @@ export default function Perfil() {
                               i === index ? { ...item, matricula: value } : item
                             )
                           )
+                          if (isVerified) setSpecialtiesModified(true)
                         }}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm text-slate-900"
                         placeholder="Matrícula (ej: MP 1234)"
                       />
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
                           setSpecialtiesList((prev) =>
                             prev.filter((_, i) => i !== index)
                           )
-                        }
+                          if (isVerified) setSpecialtiesModified(true)
+                        }}
                         className="inline-flex items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 p-2"
                         aria-label="Eliminar especialidad"
                       >

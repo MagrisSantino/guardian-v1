@@ -14,30 +14,34 @@ import { Clock, CalendarDays, Plus, Calendar } from 'lucide-react'
 
 type GuardiaStatus = 'creada' | 'con_postulantes' | 'asignada' | 'finalizada'
 
-const STATUS_CONFIG: Record<GuardiaStatus, { label: string; bgClass: string; textClass: string; dotClass: string }> = {
+const STATUS_CONFIG: Record<GuardiaStatus, { label: string; bgClass: string; textClass: string; dotClass: string; borderLeftClass: string }> = {
   creada: {
     label: 'Creada',
     bgClass: 'bg-blue-50/80 border-blue-200/60',
     textClass: 'text-blue-700',
     dotClass: 'bg-blue-500',
+    borderLeftClass: 'border-l-4 border-l-transparent',
   },
   con_postulantes: {
     label: 'Con Postulantes',
-    bgClass: 'bg-amber-50/80 border-amber-200/60',
-    textClass: 'text-amber-700',
-    dotClass: 'bg-amber-500',
+    bgClass: 'bg-orange-50/80 border-orange-200/60',
+    textClass: 'text-orange-700',
+    dotClass: 'bg-orange-500',
+    borderLeftClass: 'border-l-4 border-l-orange-400',
   },
   asignada: {
     label: 'Asignada',
     bgClass: 'bg-emerald-50/80 border-emerald-200/60',
     textClass: 'text-emerald-700',
     dotClass: 'bg-emerald-500',
+    borderLeftClass: 'border-l-4 border-l-emerald-500',
   },
   finalizada: {
     label: 'Finalizada',
     bgClass: 'bg-slate-100/80 border-slate-200/60',
     textClass: 'text-slate-600',
     dotClass: 'bg-slate-400',
+    borderLeftClass: 'border-l-4 border-l-transparent',
   },
 }
 
@@ -75,7 +79,7 @@ function OfertaCard({
     <button
       type="button"
       onClick={onClick}
-      className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:bg-slate-50 hover:shadow-md"
+      className={`w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:bg-slate-50 hover:shadow-md ${STATUS_CONFIG[guardiaStatus].borderLeftClass}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">

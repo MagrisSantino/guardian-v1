@@ -50,7 +50,7 @@ interface StatusConfig {
   bgClass: string
   textClass: string
   dotClass: string
-  mobileBorderClass: string
+  borderLeftClass: string
 }
 
 const STATUS_CONFIG: Record<GuardiaStatus, StatusConfig> = {
@@ -59,28 +59,28 @@ const STATUS_CONFIG: Record<GuardiaStatus, StatusConfig> = {
     bgClass: 'bg-blue-50/80 border-blue-200/60',
     textClass: 'text-blue-700',
     dotClass: 'bg-blue-500',
-    mobileBorderClass: 'border-l-blue-500',
+    borderLeftClass: 'border-l-4 border-l-transparent',
   },
   con_postulantes: {
     label: 'Con Postulantes',
-    bgClass: 'bg-amber-50/80 border-amber-200/60',
-    textClass: 'text-amber-700',
-    dotClass: 'bg-amber-500',
-    mobileBorderClass: 'border-l-amber-500',
+    bgClass: 'bg-orange-50/80 border-orange-200/60',
+    textClass: 'text-orange-700',
+    dotClass: 'bg-orange-500',
+    borderLeftClass: 'border-l-4 border-l-orange-400',
   },
   asignada: {
     label: 'Asignada',
     bgClass: 'bg-emerald-50/80 border-emerald-200/60',
     textClass: 'text-emerald-700',
     dotClass: 'bg-emerald-500',
-    mobileBorderClass: 'border-l-emerald-500',
+    borderLeftClass: 'border-l-4 border-l-emerald-500',
   },
   finalizada: {
     label: 'Finalizada',
     bgClass: 'bg-slate-100/80 border-slate-200/60',
     textClass: 'text-slate-600',
     dotClass: 'bg-slate-400',
-    mobileBorderClass: 'border-l-slate-400',
+    borderLeftClass: 'border-l-4 border-l-transparent',
   },
 }
 
@@ -143,7 +143,7 @@ function GuardiaCard({
     <button
       type="button"
       onClick={(e) => onShiftClick(e, shift)}
-      className={`group w-full cursor-pointer rounded-xl border p-2 text-left transition-all duration-300 hover:shadow-md hover:scale-[1.02] xl:p-2.5 ${config.bgClass} ${isUrgent ? 'animate-pulse border-red-200 bg-red-50/80 text-red-700' : ''}`}
+      className={`group w-full cursor-pointer rounded-xl border p-2 text-left transition-all duration-300 hover:shadow-md hover:scale-[1.02] xl:p-2.5 ${config.bgClass} ${config.borderLeftClass} ${isUrgent ? 'animate-pulse border-red-200 bg-red-50/80 text-red-700 border-l-red-500' : ''}`}
     >
       <div className="mb-1 flex items-center gap-1.5">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${config.dotClass}`} />
@@ -192,7 +192,7 @@ function GuardiaCardMobile({
     <button
       type="button"
       onClick={(e) => onShiftClick(e, shift)}
-      className={`w-full cursor-pointer rounded-xl border border-l-[3px] bg-white p-3.5 text-left shadow-sm transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${config.mobileBorderClass} ${isUrgent ? 'animate-pulse border-red-200 border-l-red-500 bg-red-50/50' : ''}`}
+      className={`w-full cursor-pointer rounded-xl border bg-white p-3.5 text-left shadow-sm transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${config.borderLeftClass} ${isUrgent ? 'animate-pulse border-red-200 border-l-red-500 bg-red-50/50' : ''}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">

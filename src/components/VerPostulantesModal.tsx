@@ -193,6 +193,13 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
                 <span>{selectedApp.professional.reviews_count > 0 ? Number(selectedApp.professional.rating).toFixed(2) : 'Nuevo'}</span>
                 <span className="text-xs text-slate-400 font-medium">({selectedApp.professional.reviews_count} reseñas)</span>
               </div>
+              {selectedApp.professional?.university && String(selectedApp.professional.university).trim() !== '' && (
+                <div className="flex items-center justify-center mt-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                    🎓 {selectedApp.professional.university}
+                  </span>
+                </div>
+              )}
 
               {/* Bio / Presentación */}
               {selectedApp.professional?.bio && String(selectedApp.professional.bio).trim() !== '' && (

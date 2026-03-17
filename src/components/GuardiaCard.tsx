@@ -22,6 +22,7 @@ interface GuardiaCardProps {
   shift: any
   viewMode: ViewMode
   hasApplied?: boolean
+  isConfirmed?: boolean
   hasOverlap?: boolean
   onClick?: () => void
 }
@@ -52,7 +53,7 @@ function formatPrice(price: number | null | undefined): string {
   }).format(value)
 }
 
-export function GuardiaCard({ shift, viewMode, hasApplied, hasOverlap, onClick }: GuardiaCardProps) {
+export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverlap, onClick }: GuardiaCardProps) {
   const isGrid = viewMode === 'grid'
   const clinic = shift.clinic || shift.profiles || shift.profile || {}
   const clinicName = clinic.full_name || 'Clínica'
@@ -78,28 +79,30 @@ export function GuardiaCard({ shift, viewMode, hasApplied, hasOverlap, onClick }
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
     libraries: ['places'],
   })
-  const [distanceKm, setDistanceKm] = useState<number | null>(null)
+  const geoKey = `geo_${location}`
+  const [distanceKm, setDistanceKm] = useState<number | null>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem(geoKey)
+      return cached !== null ? Number(cached) : null
+    }
+    return null
+  })
 
   useEffect(() => {
     if (!mapsLoaded || distanceKm != null || !location) return
     const g = (window as any).google?.maps
     if (!g?.Geocoder) return
-    const geocoder = new g.Geocoder()
-    geocoder.geocode({ address: location }, (results: any, status: string) => {
-      if (status === 'OK' && results && results[0]) {
+    new g.Geocoder().geocode({ address: location }, (results: any, status: string) => {
+      if (status === 'OK' && results?.[0]) {
         const loc = results[0].geometry.location
-        const lat = loc.lat()
-        const lng = loc.lng()
-        const d = haversineKm(lat, lng, CBA_CAPITAL.lat, CBA_CAPITAL.lng)
-        setDistanceKm(Math.round(d))
+        const d = Math.round(haversineKm(loc.lat(), loc.lng(), CBA_CAPITAL.lat, CBA_CAPITAL.lng))
+        setDistanceKm(d)
+        sessionStorage.setItem(geoKey, String(d))
       }
     })
-  }, [mapsLoaded, location, distanceKm])
+  }, [mapsLoaded, location, distanceKm, geoKey])
 
-  const distanceLabel =
-    distanceKm != null
-      ? `a ${distanceKm}km de Córdoba Capital`
-      : 'a 0km de Córdoba Capital'
+  const distanceLabel = distanceKm != null ? `a ${distanceKm}km de Córdoba Capital` : null
 
   const handleClick = () => {
     if (onClick) onClick()
@@ -108,8 +111,8 @@ export function GuardiaCard({ shift, viewMode, hasApplied, hasOverlap, onClick }
   return (
     <div
       className={`group relative overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all duration-300 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-100/40 ${
-        isGrid ? 'flex flex-col' : 'flex flex-row items-center gap-4'
-      } ${incompatible ? 'border-l-4 border-l-amber-400' : ''}`}
+        isGrid ? 'flex flex-col' : 'flex flex-row items-center'
+      } ${incompatible ? 'border-l-4 border-l-amber-400' : isConfirmed ? 'border-l-4 border-l-emerald-500' : hasApplied ? 'border-l-4 border-l-orange-400' : ''}`}
       onClick={handleClick}
     >
       {/* Imagen / portada */}
@@ -126,18 +129,37 @@ export function GuardiaCard({ shift, viewMode, hasApplied, hasOverlap, onClick }
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
           <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/90 backdrop-blur-sm">
-              <Building2 className="h-4 w-4 text-blue-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/90 backdrop-blur-sm overflow-hidden">
+              {clinic.avatar_url ? (
+                <img src={clinic.avatar_url} alt={clinicName} className="h-full w-full object-cover" />
+              ) : (
+                <Building2 className="h-4 w-4 text-blue-600" />
+              )}
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold capitalize text-white drop-shadow-md">
                 {clinicName}
               </p>
               {hasApplied && !incompatible && (
-                <p className="mt-0.5 text-[11px] font-semibold text-emerald-100">Ya postulado ✓</p>
+                <p className="mt-0.5 text-[11px] font-semibold text-orange-200">Ya postulado ✓</p>
               )}
             </div>
           </div>
+          {/* Badges superpuestos en la foto (grid) */}
+          {isConfirmed && (
+            <div className="absolute left-3 top-3">
+              <div className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-black text-white shadow-md">
+                <span>✓</span> ASIGNADO
+              </div>
+            </div>
+          )}
+          {!isConfirmed && hasApplied && !incompatible && (
+            <div className="absolute left-3 top-3">
+              <div className="inline-flex items-center gap-1 rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-black text-white shadow-md">
+                <span>✓</span> YA POSTULADO
+              </div>
+            </div>
+          )}
           {incompatible && (
             <div className="absolute left-3 top-3">
               <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-500 px-2.5 py-1 text-[10px] font-semibold text-white shadow-md">
@@ -151,7 +173,7 @@ export function GuardiaCard({ shift, viewMode, hasApplied, hasOverlap, onClick }
 
       {/* Mini imagen en modo lista */}
       {!isGrid && (
-        <div className="relative h-24 w-44 shrink-0 overflow-hidden rounded-l-2xl">
+        <div className="relative w-44 sm:w-56 shrink-0 self-stretch overflow-hidden rounded-l-2xl" style={{minHeight: '96px'}}>
           {coverUrl ? (
             <img src={coverUrl} alt={clinicName} className="h-full w-full object-cover" />
           ) : (
@@ -167,16 +189,30 @@ export function GuardiaCard({ shift, viewMode, hasApplied, hasOverlap, onClick }
         </div>
       )}
 
-      <div className={`flex-1 ${isGrid ? 'p-5' : 'flex flex-col gap-2 px-4 py-3'}`}>
+      <div className={`flex-1 ${isGrid ? 'p-5' : 'flex flex-col justify-center gap-2 px-4 py-3'}`}>
         {/* Nombre clínica (solo lista, en grid ya va en la imagen) */}
         {!isGrid && (
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50">
-              <Building2 className="h-4 w-4 text-blue-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 overflow-hidden shrink-0">
+              {clinic.avatar_url ? (
+                <img src={clinic.avatar_url} alt={clinicName} className="h-full w-full object-cover" />
+              ) : (
+                <Building2 className="h-4 w-4 text-blue-600" />
+              )}
             </div>
-            <p className="truncate text-sm font-semibold capitalize text-slate-900">
-              {clinicName}
-            </p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold capitalize text-slate-900">{clinicName}</p>
+              {isConfirmed && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black text-white">
+                  ✓ Asignado
+                </span>
+              )}
+              {!isConfirmed && hasApplied && !incompatible && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-black text-white">
+                  ✓ Ya postulado
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -215,69 +251,44 @@ export function GuardiaCard({ shift, viewMode, hasApplied, hasOverlap, onClick }
           </div>
         </div>
 
-        {/* Categoría, precio y botón */}
-        {isGrid ? (
-          <>
-            <div className="mt-auto flex items-end justify-between gap-3 border-t border-slate-100 pt-3">
-              <div
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${categoryClass}`}
-              >
-                <CategoryIcon className="h-3.5 w-3.5" />
-                <span className="uppercase tracking-wide">{category}</span>
+          {/* Grid mode: badge + precio + botón al pie */}
+          {isGrid && (
+            <>
+              <div className="mt-auto flex items-end justify-between gap-3 border-t border-slate-100 pt-3">
+                <div className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${categoryClass}`}>
+                  <CategoryIcon className="h-3.5 w-3.5" />
+                  <span className="uppercase tracking-wide">{category}</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-medium text-slate-500">Honorarios</p>
+                  <p className="text-lg sm:text-xl font-bold tracking-tight text-emerald-600">{formatPrice(shift.price)}</p>
+                </div>
               </div>
-
-              <div className="text-right">
-                <p className="text-xs font-medium text-slate-500">Honorarios</p>
-                <p className="text-lg sm:text-xl font-bold tracking-tight text-emerald-600">
-                  {formatPrice(shift.price)}
-                </p>
+              <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+                <button type="button" onClick={handleClick} className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
+                  Ver detalles y postularme
+                </button>
               </div>
-            </div>
+            </>
+          )}
+        </div>
 
-            <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-              <button
-                type="button"
-                onClick={handleClick}
-                className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
-              >
-                Ver detalles y postularme
-              </button>
+        {/* List mode: columna derecha con badge + precio + botón, centrados verticalmente */}
+        {!isGrid && (
+          <div className="flex shrink-0 flex-col items-center justify-center gap-3 border-l border-slate-100 px-5 py-4">
+            <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${categoryClass}`}>
+              <CategoryIcon className="h-3.5 w-3.5" />
+              <span className="uppercase tracking-wide">{category}</span>
             </div>
-          </>
-        ) : (
-          <div className="mt-2 flex items-center justify-between gap-4">
-            {/* Columna "fantasma" para alinear el badge al centro visual */}
-            <div className="flex-1" />
-
-            {/* Badge de categoría centrado verticalmente */}
-            <div className="flex items-center justify-center">
-              <div
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${categoryClass}`}
-              >
-                <CategoryIcon className="h-3.5 w-3.5" />
-                <span className="uppercase tracking-wide">{category}</span>
-              </div>
+            <div className="text-center">
+              <p className="text-xs font-medium text-slate-500">Honorarios</p>
+              <p className="text-xl font-bold tracking-tight text-emerald-600">{formatPrice(shift.price)}</p>
             </div>
-
-            {/* Precio + botón, centrados verticalmente y un poco más grandes */}
-            <div className="flex items-center gap-4 shrink-0">
-              <div className="text-right">
-                <p className="text-xs font-medium text-slate-500">Honorarios</p>
-                <p className="text-xl font-bold tracking-tight text-emerald-600">
-                  {formatPrice(shift.price)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleClick}
-                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
-              >
-                Ver detalles
-              </button>
-            </div>
+            <button type="button" onClick={handleClick} className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 whitespace-nowrap">
+              Ver detalles
+            </button>
           </div>
         )}
-      </div>
     </div>
   )
 }

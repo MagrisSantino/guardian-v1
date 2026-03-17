@@ -36,6 +36,7 @@ import {
   ClipboardList,
   Ambulance,
   X,
+  Ban,
 } from 'lucide-react'
 
 /* ─────────────────────────────────────────────
@@ -104,6 +105,34 @@ function StatusBadge({ status }: { status: UserStatus }) {
       <span className={`h-1.5 w-1.5 rounded-full ${config.dotClass}`} />
       {config.label}
     </span>
+  )
+}
+
+/** Tooltip para días bloqueados: gris oscuro con icono Ban y explicación al hover */
+function BlockedDayBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`group relative inline-flex items-center gap-1 ${compact ? '' : 'mt-0.5'}`}>
+      <div
+        className={`
+          inline-flex items-center gap-1 rounded-md
+          bg-slate-600/90 text-slate-100
+          ${compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-1 text-[10px]'}
+          font-semibold cursor-default select-none
+        `}
+      >
+        <Ban className={compact ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
+        {!compact && 'Ocupado'}
+      </div>
+      {/* Tooltip */}
+      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 hidden group-hover:block">
+        <div className="rounded-xl bg-slate-800 px-3 py-2 text-center text-[11px] text-white shadow-xl whitespace-nowrap">
+          Día con compromisos previos
+          <br />
+          <span className="text-slate-400">Sin disponibilidad registrada</span>
+        </div>
+        <div className="mx-auto -mt-1 h-2 w-2 rotate-45 bg-slate-800" />
+      </div>
+    </div>
   )
 }
 
@@ -296,8 +325,20 @@ function CalendarioMedicoContent() {
     }
     return []
   })
-  const [blockedDates, setBlockedDates] = useState<string[]>([])
-  const [selectedBlockedDates, setSelectedBlockedDates] = useState<string[]>([])
+  const [blockedDates, setBlockedDates] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('medico_blocked_cache')
+      return cached ? JSON.parse(cached) : []
+    }
+    return []
+  })
+  const [selectedBlockedDates, setSelectedBlockedDates] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('medico_blocked_cache')
+      return cached ? JSON.parse(cached) : []
+    }
+    return []
+  })
   const [isSelectingDays, setIsSelectingDays] = useState(false)
   const [selectedDayShifts, setSelectedDayShifts] = useState<any[] | null>(null)
   const [selectedShiftForModal, setSelectedShiftForModal] = useState<any | null>(null)
@@ -343,6 +384,7 @@ function CalendarioMedicoContent() {
 
     const blocked = Array.isArray(profile?.blocked_dates) ? profile.blocked_dates : []
     setBlockedDates(blocked)
+    sessionStorage.setItem('medico_blocked_cache', JSON.stringify(blocked))
     if (!isSelectingDays) setSelectedBlockedDates(blocked)
 
     if (confirmedData) {
@@ -519,13 +561,6 @@ function CalendarioMedicoContent() {
         {/* Stats bar */}
         <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 sm:mb-8">
           <StatCard
-            title="Total Guardias"
-            value={stats.total}
-            subtitle="Este mes"
-            icon={<CalendarDays className="h-5 w-5 text-blue-600" />}
-            accentClass="bg-blue-50"
-          />
-          <StatCard
             title="Disponibles"
             value={stats.disponibles}
             subtitle="Para postularte"
@@ -542,9 +577,16 @@ function CalendarioMedicoContent() {
           <StatCard
             title="Confirmadas"
             value={stats.confirmadas}
-            subtitle="Completadas"
+            subtitle="Guardias asignadas"
             icon={<UserCheck className="h-5 w-5 text-emerald-600" />}
             accentClass="bg-emerald-50"
+          />
+          <StatCard
+            title="Completadas"
+            value={stats.completadas}
+            subtitle="Historial del mes"
+            icon={<CheckCircle2 className="h-5 w-5 text-slate-500" />}
+            accentClass="bg-slate-100"
           />
         </div>
 
@@ -665,15 +707,17 @@ function CalendarioMedicoContent() {
                             key={dateKey}
                             role={isSelectingDays ? 'button' : undefined}
                             onClick={isSelectingDays ? (e) => { e.stopPropagation(); toggleBlockedDate(dateKey); } : undefined}
-                            className={`relative flex flex-col items-center justify-center py-2.5 ${!isCurrentMonth ? 'opacity-30' : ''} ${isBlocked ? 'bg-slate-200/80' : ''} ${isSelectingDays ? 'cursor-pointer' : ''}`}
+                            className={`relative flex flex-col items-center justify-center py-2.5 ${!isCurrentMonth ? 'opacity-30' : ''} ${isBlocked ? 'bg-slate-400/40' : ''} ${isSelectingDays ? 'cursor-pointer' : ''}`}
                           >
                             <span
                               className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-medium ${
                                 isTodayCell
                                   ? 'bg-blue-600 font-bold text-white shadow-sm'
-                                  : ci >= 5
-                                    ? 'text-blue-600/80'
-                                    : 'text-slate-900'
+                                  : isBlocked
+                                    ? 'text-slate-500 font-semibold'
+                                    : ci >= 5
+                                      ? 'text-blue-600/80'
+                                      : 'text-slate-900'
                               }`}
                             >
                               {format(day, 'd')}
@@ -682,7 +726,9 @@ function CalendarioMedicoContent() {
                               <span className="mt-0.5 h-1 w-1 rounded-full bg-blue-500" />
                             )}
                             {isBlocked && (
-                              <span className="mt-0.5 h-1 w-1 rounded-full bg-slate-500" />
+                              <span className="mt-0.5">
+                                <BlockedDayBadge compact />
+                              </span>
                             )}
                           </div>
                         )
@@ -711,8 +757,8 @@ function CalendarioMedicoContent() {
                       role={isSelectingDays ? 'button' : undefined}
                       onClick={isSelectingDays ? () => toggleBlockedDate(dateKey) : undefined}
                       className={`rounded-xl border bg-white transition-all duration-200 ${
-                        isTodayCell ? 'border-blue-300 shadow-sm shadow-blue-500/10' : 'border-slate-200'
-                      } ${!isCurrentMonth ? 'opacity-40' : ''} ${isBlocked ? 'bg-slate-200/80' : ''} ${isSelectingDays ? 'cursor-pointer' : ''}`}
+                        isTodayCell ? 'border-blue-300 shadow-sm shadow-blue-500/10' : isBlocked ? 'border-slate-400' : 'border-slate-200'
+                      } ${!isCurrentMonth ? 'opacity-40' : ''} ${isBlocked ? 'bg-slate-300/60' : ''} ${isSelectingDays ? 'cursor-pointer' : ''}`}
                     >
                       <div
                         className={`flex w-full items-center gap-2.5 px-3.5 py-2.5 ${guardias.length > 0 ? 'border-b border-slate-100' : ''}`}
@@ -721,9 +767,11 @@ function CalendarioMedicoContent() {
                           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
                             isTodayCell
                               ? 'bg-blue-600 text-white shadow-sm'
-                              : ci >= 5
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-slate-100 text-slate-700'
+                              : isBlocked
+                                ? 'bg-slate-500 text-white'
+                                : ci >= 5
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-slate-100 text-slate-700'
                           }`}
                         >
                           {format(day, 'd')}
@@ -733,15 +781,13 @@ function CalendarioMedicoContent() {
                             {DAYS_LONG[ci]}
                           </span>
                           {isTodayCell && (
-                            <span className="ml-2 rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
-                              HOY
-                            </span>
-                          )}
-                          {isBlocked && (
-                            <span className="ml-2 rounded-md bg-slate-300 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
-                              Ocupado
-                            </span>
-                          )}
+                              <span className="ml-2 rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                                HOY
+                              </span>
+                            )}
+                            {isBlocked && !isTodayCell && (
+                              <BlockedDayBadge />
+                            )}
                         </div>
                         {guardias.length > 0 && !isSelectingDays && (
                           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">
@@ -809,10 +855,15 @@ function CalendarioMedicoContent() {
                       key={dateKey}
                       role="button"
                       onClick={handleCellClick}
-                      className={`group relative min-h-[110px] border-b border-slate-100 p-2 transition-colors duration-200 lg:min-h-[130px] ${!isLastInRow ? 'border-r border-slate-100' : ''} ${isWeekend ? 'bg-slate-50/50' : ''} ${isBlocked ? 'bg-slate-200/80' : hasGuardias ? 'cursor-pointer hover:bg-slate-50' : 'hover:bg-blue-500/5'} ${isSelectingDays ? 'cursor-pointer' : ''}`}
+                      className={`group relative min-h-[110px] border-b border-slate-100 p-2 transition-colors duration-200 lg:min-h-[130px] ${!isLastInRow ? 'border-r border-slate-100' : ''} ${isWeekend ? 'bg-slate-50/50' : ''} ${isBlocked ? 'bg-slate-300/70 cursor-default' : hasGuardias ? 'cursor-pointer hover:bg-slate-50' : 'hover:bg-blue-500/5'} ${isSelectingDays ? 'cursor-pointer' : ''}`}
                     >
                       {isBlocked && (
-                        <div className="absolute inset-0 pointer-events-none bg-[repeating-linear-gradient(-45deg,transparent,transparent_6px,rgba(0,0,0,0.03)_6px,rgba(0,0,0,0.03)_8px)] rounded-sm" aria-hidden />
+                        <>
+                          <div className="absolute inset-0 pointer-events-none bg-[repeating-linear-gradient(-45deg,transparent,transparent_6px,rgba(0,0,0,0.05)_6px,rgba(0,0,0,0.05)_8px)] rounded-sm" aria-hidden />
+                          <div className="absolute top-2 right-2 z-20">
+                            <BlockedDayBadge compact />
+                          </div>
+                        </>
                       )}
                       <div className="mb-1.5 flex items-start relative z-10">
                         <span

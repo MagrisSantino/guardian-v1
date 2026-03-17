@@ -10,10 +10,16 @@ import { CalendarDays, CheckCircle2 } from 'lucide-react'
 import DetalleGuardiaMedicoModal from '@/components/DetalleGuardiaMedicoModal'
 
 export default function MisGuardiasPage() {
-  const [myGuardias, setMyGuardias] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [myGuardias, setMyGuardias] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('mis_guardias_cache')
+      return cached ? JSON.parse(cached) : []
+    }
+    return []
+  })
   const [selectedShift, setSelectedShift] = useState<any | null>(null)
   const [selectedUserStatus, setSelectedUserStatus] = useState<'confirmado' | 'completada' | ''>('')
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
   async function fetchMyGuardias() {
@@ -33,11 +39,13 @@ export default function MisGuardiasPage() {
       .eq('professional_id', session.user.id)
       .in('status', ['filled', 'completed'])
       .order('date_time', { ascending: true })
-    setMyGuardias(data || [])
-    setLoading(false)
+    const result = data || []
+    setMyGuardias(result)
+    sessionStorage.setItem('mis_guardias_cache', JSON.stringify(result))
   }
 
   useEffect(() => {
+    setMounted(true)
     fetchMyGuardias()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -46,13 +54,10 @@ export default function MisGuardiasPage() {
   const guardiasTerminadas = myGuardias.filter(s => s.status === 'completed')
   const dineroGanado = guardiasTerminadas.reduce((sum, s) => sum + (Number(s.price) || 0), 0)
 
-  if (loading) {
-    return (
-      <main className="min-h-[calc(100vh-73px)] bg-slate-50 p-6 md:p-8 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-900" />
-      </main>
-    )
+  if (!mounted) {
+    return <main className="min-h-[calc(100vh-73px)] bg-slate-50 p-6 md:p-8"></main>
   }
+
 
   return (
     <main className="min-h-[calc(100vh-73px)] bg-slate-50 p-6 md:p-8">
