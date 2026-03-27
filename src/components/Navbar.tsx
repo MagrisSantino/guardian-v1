@@ -1,4 +1,5 @@
 'use client'
+import Image from 'next/image'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState, useRef } from 'react'
@@ -296,10 +297,13 @@ export default function Navbar() {
                     className="flex items-center gap-2 rounded-xl pl-1.5 py-1.5 pr-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
                   >
                     {avatarUrl ? (
-                      <img 
-                        src={avatarUrl} 
-                        alt={displayName} 
-                        className="h-7 w-7 rounded-full object-cover border border-slate-200" 
+                      <Image
+                        src={avatarUrl}
+                        alt={displayName}
+                        width={28}
+                        height={28}
+                        className="h-7 w-7 rounded-full object-cover border border-slate-200"
+                        unoptimized
                       />
                     ) : (
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
@@ -351,10 +355,13 @@ export default function Navbar() {
                 <>
                   <div className="mb-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
                     {avatarUrl ? (
-                      <img 
-                        src={avatarUrl} 
-                        alt={displayName} 
-                        className="h-10 w-10 shrink-0 rounded-full object-cover border border-slate-200 shadow-sm" 
+                      <Image
+                        src={avatarUrl}
+                        alt={displayName}
+                        width={40}
+                        height={40}
+                        className="h-10 w-10 shrink-0 rounded-full object-cover border border-slate-200 shadow-sm"
+                        unoptimized
                       />
                     ) : (
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">

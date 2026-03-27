@@ -70,9 +70,24 @@ export default function DashboardMedico() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return;
 
-    const { data: shiftsData } = await supabase.from('shifts').select('*, clinic:profiles!clinic_id(*)').eq('status', 'open').order('date_time', { ascending: true })
-    const { data: appsData } = await supabase.from('shift_applications').select('shift_id').eq('professional_id', session.user.id).eq('status', 'pending')
-    const { data: confirmedData } = await supabase.from('shifts').select('id, date_time, duration_hours').eq('professional_id', session.user.id).eq('status', 'filled')
+    const { data: shiftsData } = await supabase
+      .from('shifts')
+      .select('*, clinic:profiles!clinic_id(*)')
+      .eq('status', 'open')
+      .order('date_time', { ascending: true })
+      .limit(50)
+    const { data: appsData } = await supabase
+      .from('shift_applications')
+      .select('shift_id')
+      .eq('professional_id', session.user.id)
+      .eq('status', 'pending')
+      .order('id', { ascending: false })
+    const { data: confirmedData } = await supabase
+      .from('shifts')
+      .select('id, date_time, duration_hours')
+      .eq('professional_id', session.user.id)
+      .eq('status', 'filled')
+      .order('date_time', { ascending: true })
 
     if (shiftsData) {
       setShifts(shiftsData)

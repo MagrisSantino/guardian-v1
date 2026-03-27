@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   ArrowRight,
@@ -175,63 +174,109 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loginError, setLoginError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
-  const router = useRouter()
+
+  function redirectByRole(role: string | null | undefined) {
+    if (role === 'super_admin') {
+      window.location.href = '/super-admin-guardian'
+      return true
+    }
+    if (role === 'clinic_admin') {
+      window.location.href = '/dashboard-clinica'
+      return true
+    }
+    if (role === 'doctor') {
+      window.location.href = '/dashboard-medico'
+      return true
+    }
+    return false
+  }
+
+  async function ensureProfileExists() {
+    try {
+      const res = await fetch('/api/auth/ensure-profile', { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        const msg = typeof body?.error === 'string' ? body.error : `HTTP ${res.status}`
+        console.error('[login] ensure-profile failed:', msg)
+      }
+    } catch (err) {
+      console.error('[login] ensure-profile:', err)
+    }
+  }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setCheckingSession(false)
       if (!session) return
+      await ensureProfileExists()
       supabase
         .from('profiles')
         .select('role')
         .eq('id', session.user.id)
-        .single()
+        .maybeSingle()
         .then(({ data: profile }) => {
-          if (profile?.role === 'super_admin') window.location.href = '/super-admin-guardian'
-          else if (profile?.role === 'clinic_admin') window.location.href = '/dashboard-clinica'
-          else window.location.href = '/dashboard-medico'
+          const redirected = redirectByRole(profile?.role ?? null)
+          if (!redirected) {
+            setLoginError('Tu cuenta existe, pero tu perfil aún no está completo. Contactá soporte.')
+          }
         })
     })
-  }, [router])
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLoginError('')
     setLoading(true)
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      alert('Error de acceso: ' + error.message)
+      const msg = error.message.toLowerCase()
+      if (msg.includes('email not confirmed')) {
+        setLoginError(
+          'Debes verificar tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.'
+        )
+      } else {
+        setLoginError('Error de acceso: ' + error.message)
+      }
       setLoading(false)
     } else {
+      await ensureProfileExists()
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', data.user.id)
-        .single()
+        .maybeSingle()
 
-      if (profile?.role === 'super_admin') {
-        window.location.href = '/super-admin-guardian'
-      } else if (profile?.role === 'clinic_admin') {
-        window.location.href = '/dashboard-clinica'
-      } else {
+      if (profile?.role === 'doctor') {
         const [openRes, myRes] = await Promise.all([
           supabase
             .from('shifts')
             .select('*, clinic:profiles!clinic_id(full_name)')
             .eq('status', 'open')
-            .order('date_time', { ascending: true }),
+            .order('date_time', { ascending: true })
+            .limit(50),
           supabase
             .from('shifts')
             .select('*, clinic:profiles!clinic_id(full_name)')
             .eq('professional_id', data.user.id)
-            .eq('status', 'filled'),
+            .eq('status', 'filled')
+            .order('date_time', { ascending: true }),
         ])
         if (openRes.data) sessionStorage.setItem('medico_feed_cache', JSON.stringify(openRes.data))
         const allCalendarShifts = [...(openRes.data || []), ...(myRes.data || [])]
         sessionStorage.setItem('medico_calendar_cache', JSON.stringify(allCalendarShifts))
         window.location.href = '/dashboard-medico'
+        return
+      }
+
+      const redirected = redirectByRole(profile?.role ?? null)
+      if (!redirected) {
+        await supabase.auth.signOut()
+        setLoginError('No pudimos completar el acceso porque falta tu perfil. Volvé a registrarte o contactá soporte.')
+        setLoading(false)
       }
     }
   }
@@ -269,6 +314,14 @@ export default function LoginPage() {
             </div>
 
             <div className="px-8 pt-7 pb-9 md:px-10">
+              {loginError && (
+                <div
+                  role="alert"
+                  className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                >
+                  {loginError}
+                </div>
+              )}
               <LoginForm
                 email={email}
                 setEmail={setEmail}

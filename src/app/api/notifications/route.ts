@@ -162,19 +162,26 @@ export async function POST(request: NextRequest) {
             )
             return
           }
-          await sendNuevaGuardiaPublicadaEmail({
-            toEmail: email,
-            toName: doc.full_name,
-            shiftTitle,
-            clinicName,
-            shiftCategory: shift.shift_category,
-            specialtyRequired: shift.specialty_required,
-            dateTime: shift.date_time,
-            price: shift.price,
-          })
-          console.log(
-            `[notifications] ✓ mail OK NEW_SHIFT → ${maskEmail(email)} | ${doc.full_name ?? doc.id}`,
-          )
+          try {
+            await sendNuevaGuardiaPublicadaEmail({
+              toEmail: email,
+              toName: doc.full_name,
+              shiftTitle,
+              clinicName,
+              shiftCategory: shift.shift_category,
+              specialtyRequired: shift.specialty_required,
+              dateTime: shift.date_time,
+              price: shift.price,
+            })
+            console.log(
+              `[notifications] ✓ mail OK NEW_SHIFT → ${maskEmail(email)} | ${doc.full_name ?? doc.id}`,
+            )
+          } catch (e) {
+            console.error(
+              `[notifications] mail fallido NEW_SHIFT → ${maskEmail(email)} | ${doc.full_name ?? doc.id}:`,
+              e,
+            )
+          }
         })())
       }
     }
@@ -197,16 +204,20 @@ export async function POST(request: NextRequest) {
           )
           return
         }
-        await sendGuardiaAsignadaEmail({
-          toEmail: email,
-          toName: doctorProfile.full_name,
-          shiftTitle,
-          clinicName,
-          dateTime: shift.date_time,
-        })
-        console.log(
-          `[notifications] ✓ mail OK SHIFT_ASSIGNED → ${maskEmail(email)} | ${doctorProfile.full_name ?? doctorProfile.id} | clínica: ${clinicName ?? '—'}`,
-        )
+        try {
+          await sendGuardiaAsignadaEmail({
+            toEmail: email,
+            toName: doctorProfile.full_name,
+            shiftTitle,
+            clinicName,
+            dateTime: shift.date_time,
+          })
+          console.log(
+            `[notifications] ✓ mail OK SHIFT_ASSIGNED → ${maskEmail(email)} | ${doctorProfile.full_name ?? doctorProfile.id} | clínica: ${clinicName ?? '—'}`,
+          )
+        } catch (e) {
+          console.error(`[notifications] mail fallido SHIFT_ASSIGNED → ${maskEmail(email)}:`, e)
+        }
       })())
     }
 
@@ -245,16 +256,20 @@ export async function POST(request: NextRequest) {
           )
           return
         }
-        await sendNuevaPostulacionEmail({
-          toEmail: email,
-          clinicName: clinicProfile.full_name,
-          doctorName: doctorProfile.full_name,
-          shiftTitle,
-          dateTime: shift.date_time,
-        })
-        console.log(
-          `[notifications] ✓ mail OK NUEVA_POSTULACIÓN → ${maskEmail(email)} | clínica: ${clinicProfile.full_name ?? clinicProfile.id} | postulante: ${doctorProfile.full_name ?? doctorProfile.id}`,
-        )
+        try {
+          await sendNuevaPostulacionEmail({
+            toEmail: email,
+            clinicName: clinicProfile.full_name,
+            doctorName: doctorProfile.full_name,
+            shiftTitle,
+            dateTime: shift.date_time,
+          })
+          console.log(
+            `[notifications] ✓ mail OK NUEVA_POSTULACIÓN → ${maskEmail(email)} | clínica: ${clinicProfile.full_name ?? clinicProfile.id} | postulante: ${doctorProfile.full_name ?? doctorProfile.id}`,
+          )
+        } catch (e) {
+          console.error(`[notifications] mail fallido NEW_APPLICATION → ${maskEmail(email)}:`, e)
+        }
       })())
     }
 
@@ -269,15 +284,19 @@ export async function POST(request: NextRequest) {
           )
           return
         }
-        await sendBajaDeMedicoEmail({
-          toEmail: email,
-          clinicName: clinicProfile.full_name,
-          shiftTitle,
-          dateTime: shift.date_time,
-        })
-        console.log(
-          `[notifications] ✓ mail OK BAJA_MÉDICO → ${maskEmail(email)} | clínica: ${clinicProfile.full_name ?? clinicProfile.id}`,
-        )
+        try {
+          await sendBajaDeMedicoEmail({
+            toEmail: email,
+            clinicName: clinicProfile.full_name,
+            shiftTitle,
+            dateTime: shift.date_time,
+          })
+          console.log(
+            `[notifications] ✓ mail OK BAJA_MÉDICO → ${maskEmail(email)} | clínica: ${clinicProfile.full_name ?? clinicProfile.id}`,
+          )
+        } catch (e) {
+          console.error(`[notifications] mail fallido DOCTOR_CANCELLED → ${maskEmail(email)}:`, e)
+        }
       })())
     }
 

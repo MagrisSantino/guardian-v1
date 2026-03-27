@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useLoadScript, Autocomplete } from '@react-google-maps/api'
@@ -363,7 +364,14 @@ export default function Perfil() {
                   disabled={uploadingCover}
                 />
                 {coverUrl ? (
-                  <img src={coverUrl} alt="Portada" className="w-full h-full object-cover" />
+                  <Image
+                    src={coverUrl}
+                    alt="Portada"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 672px"
+                    unoptimized
+                  />
                 ) : (
                   <span className="sr-only" aria-hidden />
                 )}
@@ -402,7 +410,16 @@ export default function Perfil() {
                   {uploadingAvatar ? (
                     <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
                   ) : avatarUrl ? (
-                    <img src={avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0">
+                      <Image
+                        src={avatarUrl}
+                        alt="Foto de perfil"
+                        fill
+                        className="object-cover"
+                        sizes="128px"
+                        unoptimized
+                      />
+                    </div>
                   ) : (
                     <User className="w-14 h-14 md:w-16 md:h-16 text-slate-400" />
                   )}
@@ -470,7 +487,14 @@ export default function Perfil() {
                   disabled={uploadingCover}
                 />
                 {coverUrl ? (
-                  <img src={coverUrl} alt="Portada" className="w-full h-full object-cover" />
+                  <Image
+                    src={coverUrl}
+                    alt="Portada"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 672px"
+                    unoptimized
+                  />
                 ) : (
                   <span className="sr-only" aria-hidden />
                 )}
@@ -508,7 +532,16 @@ export default function Perfil() {
                     {uploadingAvatar ? (
                       <Loader2 className="w-7 h-7 text-blue-500 animate-spin" />
                     ) : avatarUrl ? (
-                      <img src={avatarUrl} alt="Logo de la clínica" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0">
+                        <Image
+                          src={avatarUrl}
+                          alt="Logo de la clínica"
+                          fill
+                          className="object-cover"
+                          sizes="96px"
+                          unoptimized
+                        />
+                      </div>
                     ) : (
                       <User className="w-10 h-10 text-slate-400" />
                     )}

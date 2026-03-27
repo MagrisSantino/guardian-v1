@@ -132,7 +132,7 @@ function PanelClinicaContent() {
       .from('shifts')
       .select('*, applicants:shift_applications(status)')
       .eq('clinic_id', session.user.id)
-      .order('date_time', { ascending: false })
+      .order('date_time', { ascending: true })
     setShifts(data || [])
     setLoading(false)
   }

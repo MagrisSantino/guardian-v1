@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -119,10 +120,13 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
       {isGrid && (
         <div className="relative h-32 w-full overflow-hidden">
           {coverUrl ? (
-            <img
+            <Image
               src={coverUrl}
               alt={clinicName}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              sizes="(max-width: 768px) 100vw, 400px"
+              unoptimized
             />
           ) : (
             <div className="h-full w-full bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400" />
@@ -131,7 +135,14 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
           <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/90 backdrop-blur-sm overflow-hidden">
               {clinic.avatar_url ? (
-                <img src={clinic.avatar_url} alt={clinicName} className="h-full w-full object-cover" />
+                <Image
+                  src={clinic.avatar_url}
+                  alt={clinicName}
+                  width={36}
+                  height={36}
+                  className="h-full w-full object-cover"
+                  unoptimized
+                />
               ) : (
                 <Building2 className="h-4 w-4 text-blue-600" />
               )}
@@ -173,9 +184,16 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
 
       {/* Mini imagen en modo lista */}
       {!isGrid && (
-        <div className="relative w-44 sm:w-56 shrink-0 self-stretch overflow-hidden rounded-l-2xl" style={{minHeight: '96px'}}>
+        <div className="relative w-44 sm:w-56 min-h-[96px] shrink-0 self-stretch overflow-hidden rounded-l-2xl">
           {coverUrl ? (
-            <img src={coverUrl} alt={clinicName} className="h-full w-full object-cover" />
+            <Image
+              src={coverUrl}
+              alt={clinicName}
+              fill
+              className="object-cover"
+              sizes="224px"
+              unoptimized
+            />
           ) : (
             <div className="h-full w-full bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400" />
           )}
@@ -195,7 +213,14 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 overflow-hidden shrink-0">
               {clinic.avatar_url ? (
-                <img src={clinic.avatar_url} alt={clinicName} className="h-full w-full object-cover" />
+                <Image
+                  src={clinic.avatar_url}
+                  alt={clinicName}
+                  width={36}
+                  height={36}
+                  className="h-full w-full object-cover"
+                  unoptimized
+                />
               ) : (
                 <Building2 className="h-4 w-4 text-blue-600" />
               )}

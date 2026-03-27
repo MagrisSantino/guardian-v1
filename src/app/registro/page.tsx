@@ -340,6 +340,14 @@ export default function RegistroPage() {
     return raw.replace(/[^\d]/g, '')
   }
 
+  function mapRoleForDb(rawRole: string): 'doctor' | 'clinic_admin' {
+    const normalized = rawRole.trim().toLowerCase()
+    if (normalized === 'clinic_admin' || normalized === 'clinica') {
+      return 'clinic_admin'
+    }
+    return 'doctor'
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setCheckingSession(false)
@@ -387,20 +395,50 @@ export default function RegistroPage() {
     }
 
     const normalizedWhatsapp = normalizeWhatsAppInput(phone)
+    const roleForDb = mapRoleForDb(role)
+    const normalizedCuit = cuit.replace(/[^\d]/g, '').trim()
+    const normalizedFullName =
+      (roleForDb === 'clinic_admin' ? institutionName : name).trim() ||
+      adminName.trim() ||
+      name.trim() ||
+      institutionName.trim() ||
+      email.split('@')[0]?.trim() ||
+      'Usuario'
+
+    if (!normalizedFullName) {
+      setError('Debes completar un nombre válido para continuar.')
+      setLoading(false)
+      return
+    }
+
+    if (roleForDb === 'clinic_admin' && !normalizedCuit) {
+      setError('Debes completar un CUIT/CUIL válido para continuar.')
+      setLoading(false)
+      return
+    }
+
+    const emailRedirectTo =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback`
+        : undefined
 
     const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo,
         data: {
-          full_name: role === 'clinic_admin' ? institutionName : name,
-          admin_name: role === 'clinic_admin' ? adminName : null,
+          full_name: normalizedFullName,
+          institution_name:
+            roleForDb === 'clinic_admin' ? institutionName.trim() || normalizedFullName : null,
+          admin_name: roleForDb === 'clinic_admin' ? adminName.trim() || null : null,
+          cuit: roleForDb === 'clinic_admin' ? normalizedCuit : null,
           whatsapp: normalizedWhatsapp || null,
-          location_maps: role === 'clinic_admin' ? address : null,
-          role,
-          dni: role === 'doctor' ? dni : null,
-          matricula: role === 'doctor' ? (matricula || null) : null,
-          birth_date: role === 'doctor' ? birthDate || null : null,
+          location_maps: roleForDb === 'clinic_admin' ? address.trim() || null : null,
+          role: roleForDb,
+          dni: roleForDb === 'doctor' ? dni.trim() || null : null,
+          matricula: roleForDb === 'doctor' ? matricula.trim() || null : null,
+          birth_date: roleForDb === 'doctor' ? birthDate || null : null,
         },
       },
     })
@@ -408,17 +446,24 @@ export default function RegistroPage() {
     setLoading(false)
     if (signUpError) {
       const msg = signUpError.message.toLowerCase()
-      if (msg.includes('dni') || msg.includes('matricula')) {
-        setError(
-          'El DNI o Matrícula ingresados ya se encuentran registrados en otra cuenta.'
-        )
+      const code = String((signUpError as { code?: string }).code || '').toLowerCase()
+      const diagnostic = `${msg} ${code}`
+
+      if (diagnostic.includes('dni') || diagnostic.includes('profiles_dni_key')) {
+        setError('El DNI ingresado ya se encuentra registrado en otra cuenta.')
+      } else if (
+        diagnostic.includes('matricula') ||
+        diagnostic.includes('profiles_matricula_key')
+      ) {
+        setError('La matrícula ingresada ya se encuentra registrada en otra cuenta.')
+      } else if (diagnostic.includes('email') && diagnostic.includes('already')) {
+        setError('Este correo electrónico ya está registrado. Iniciá sesión o recuperá tu cuenta.')
       } else {
         setError(signUpError.message)
       }
       return
     }
-    alert('¡Cuenta creada con éxito! Por favor, iniciá sesión.')
-    router.push('/login')
+    router.replace('/verificar-email')
   }
 
   function handleNext() {

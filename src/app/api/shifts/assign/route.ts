@@ -52,6 +52,26 @@ export async function POST(request: NextRequest) {
 
     const admin = createSupabaseAdmin()
 
+    const { data: userProfile, error: profileErr } = await admin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profileErr || !userProfile) {
+      return NextResponse.json(
+        { error: 'Acceso denegado. Rol no autorizado.' },
+        { status: 403 },
+      )
+    }
+
+    if (userProfile.role !== 'clinic_admin' && userProfile.role !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Acceso denegado. Rol no autorizado.' },
+        { status: 403 },
+      )
+    }
+
     const { data: shift, error: shiftErr } = await admin
       .from('shifts')
       .select('id, clinic_id, status, date_time, duration_hours, title')
@@ -101,6 +121,7 @@ export async function POST(request: NextRequest) {
       .eq('professional_id', professionalId)
       .eq('status', 'pending')
       .neq('shift_id', shiftId)
+      .order('id', { ascending: false })
 
     const otherShiftIds = [...new Set((otherPendingApps || []).map((r: { shift_id: string }) => r.shift_id))]
 
@@ -182,49 +203,61 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const notifWinner = {
-      user_id: professionalId,
-      shift_id: shiftId,
-      title: '¡Guardia Asignada!',
-      message: 'La clínica te ha asignado la guardia.',
-    }
-    await admin.from('notifications').insert([notifWinner])
-
-    if (loserIds.length > 0) {
-      await admin.from('notifications').insert(
-        loserIds.map((user_id: string) => ({
-          user_id,
-          shift_id: shiftId,
-          title: 'Guardia Cubierta',
-          message: 'La guardia a la que te postulaste ya fue cubierta por otro profesional.',
-        })),
-      )
-    }
-
-    if (crossShiftRejectAppIds.length > 0) {
-      const rejectSet = new Set(crossShiftRejectAppIds)
-      const appMeta = (otherPendingApps || []).filter((a) => rejectSet.has(a.id as string))
-      await admin.from('notifications').insert(
-        appMeta.map((a) => ({
-          user_id: professionalId,
-          shift_id: a.shift_id as string,
-          title: 'Postulación retirada',
-          message:
-            'Tu postulación se rechazó automáticamente: hay solapamiento con otra guardia que te asignaron.',
-        })),
-      )
-    }
-
-    void fetch(`${request.nextUrl.origin}/api/notifications`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'SHIFT_ASSIGNED',
+    try {
+      const notifWinner = {
+        user_id: professionalId,
         shift_id: shiftId,
-        professional_id: professionalId,
-        clinic_id: shift.clinic_id,
-      }),
-    }).catch(() => {})
+        title: '¡Guardia Asignada!',
+        message: 'La clínica te ha asignado la guardia.',
+      }
+      await admin.from('notifications').insert([notifWinner])
+
+      if (loserIds.length > 0) {
+        await admin.from('notifications').insert(
+          loserIds.map((user_id: string) => ({
+            user_id,
+            shift_id: shiftId,
+            title: 'Guardia Cubierta',
+            message: 'La guardia a la que te postulaste ya fue cubierta por otro profesional.',
+          })),
+        )
+      }
+
+      if (crossShiftRejectAppIds.length > 0) {
+        const rejectSet = new Set(crossShiftRejectAppIds)
+        const appMeta = (otherPendingApps || []).filter((a) => rejectSet.has(a.id as string))
+        await admin.from('notifications').insert(
+          appMeta.map((a) => ({
+            user_id: professionalId,
+            shift_id: a.shift_id as string,
+            title: 'Postulación retirada',
+            message:
+              'Tu postulación se rechazó automáticamente: hay solapamiento con otra guardia que te asignaron.',
+          })),
+        )
+      }
+    } catch (notifErr) {
+      console.error('[assign] notificaciones in-app (no aborta respuesta):', notifErr)
+    }
+
+    try {
+      const res = await fetch(`${request.nextUrl.origin}/api/notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SHIFT_ASSIGNED',
+          shift_id: shiftId,
+          professional_id: professionalId,
+          clinic_id: shift.clinic_id,
+        }),
+      })
+      if (!res.ok) {
+        const t = await res.text().catch(() => '')
+        console.error('[assign] /api/notifications SHIFT_ASSIGNED status=', res.status, t)
+      }
+    } catch (mailErr) {
+      console.error('[assign] correo SHIFT_ASSIGNED (no aborta respuesta):', mailErr)
+    }
 
     return NextResponse.json({
       ok: true,

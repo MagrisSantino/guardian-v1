@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -76,6 +77,7 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
       .select('*, professional:profiles!professional_id(*)')
       .eq('shift_id', shift.id)
       .in('status', ['pending', 'accepted'])
+      .order('id', { ascending: false })
 
     if (data) setApplications(data)
     setLoading(false)
@@ -141,23 +143,29 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
             </button>
 
             {/* Banner + avatar estilo red social */}
-            <div className="relative h-32 md:h-40 w-full shrink-0">
+            <div className="relative h-32 md:h-40 w-full shrink-0 overflow-hidden">
               {getPublicImageUrl(selectedApp.professional?.cover_url) ? (
-                <img
+                <Image
                   src={getPublicImageUrl(selectedApp.professional?.cover_url)!}
                   alt="Portada"
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="100vw"
+                  unoptimized
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400" />
               )}
               <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2">
-                <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-white bg-slate-100 shadow-xl overflow-hidden flex items-center justify-center">
+                <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-white bg-slate-100 shadow-xl overflow-hidden flex items-center justify-center">
                   {getPublicImageUrl(selectedApp.professional?.avatar_url) ? (
-                    <img
+                    <Image
                       src={getPublicImageUrl(selectedApp.professional?.avatar_url)!}
                       alt="Avatar"
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="96px"
+                      unoptimized
                     />
                   ) : (
                     <span className="text-3xl md:text-4xl">👨‍⚕️</span>
@@ -358,7 +366,7 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="w-12 h-12 rounded-full border-2 border-slate-200 bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center">
                           {avatarSrc ? (
-                            <img src={avatarSrc} alt="" className="w-full h-full object-cover" />
+                            <Image src={avatarSrc} alt="" width={48} height={48} className="w-full h-full object-cover" unoptimized />
                           ) : (
                             <span className="text-xl">👨‍⚕️</span>
                           )}

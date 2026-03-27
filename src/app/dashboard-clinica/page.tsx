@@ -286,6 +286,7 @@ function DashboardClinicaContent() {
       .from('shifts')
       .select('*, applicants:shift_applications(status)')
       .eq('clinic_id', session.user.id)
+      .order('date_time', { ascending: true })
     if (data) setMyShifts(data)
   }
 

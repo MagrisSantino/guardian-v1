@@ -39,6 +39,7 @@ export default function MisGuardiasPage() {
       .eq('professional_id', session.user.id)
       .in('status', ['filled', 'completed'])
       .order('date_time', { ascending: true })
+      .limit(200)
     const result = data || []
     setMyGuardias(result)
     sessionStorage.setItem('mis_guardias_cache', JSON.stringify(result))

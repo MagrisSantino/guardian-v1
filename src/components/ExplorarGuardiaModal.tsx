@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { AlertCircle, Activity, CalendarDays, Ambulance, MapPin, Clock, DollarSign, Briefcase, X } from 'lucide-react'
@@ -154,9 +155,16 @@ export default function ExplorarGuardiaModal({
       <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-5xl shadow-2xl animate-in fade-in zoom-in-95 relative my-4 overflow-hidden flex flex-col md:flex-row">
 
         {/* ── FOTO PORTADA: arriba en mobile, columna izquierda en desktop ── */}
-        <div className="relative h-52 md:h-auto md:w-64 lg:w-80 shrink-0">
+        <div className="relative h-52 md:min-h-[280px] md:w-64 lg:w-80 shrink-0 overflow-hidden">
           {coverUrl ? (
-            <img src={coverUrl} alt={shift?.clinic?.full_name} className="w-full h-full object-cover" />
+            <Image
+              src={coverUrl}
+              alt={shift?.clinic?.full_name || 'Clínica'}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 320px"
+              unoptimized
+            />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-blue-700 via-blue-500 to-slate-600" />
           )}
@@ -165,8 +173,12 @@ export default function ExplorarGuardiaModal({
 
           {/* Avatar + nombre encima de la foto */}
           <div className="absolute bottom-4 left-4 right-4 flex items-end gap-3">
-            <div className="w-12 h-12 rounded-xl border-2 border-white bg-slate-100 overflow-hidden shrink-0 shadow-md">
-              {avatarUrl ? <img src={avatarUrl} alt="Logo" className="w-full h-full object-cover" /> : <span className="text-2xl flex items-center justify-center h-full">🏥</span>}
+            <div className="relative w-12 h-12 rounded-xl border-2 border-white bg-slate-100 overflow-hidden shrink-0 shadow-md">
+              {avatarUrl ? (
+                <Image src={avatarUrl} alt="Logo" fill className="object-cover" sizes="48px" unoptimized />
+              ) : (
+                <span className="text-2xl flex items-center justify-center h-full">🏥</span>
+              )}
             </div>
             <div className="min-w-0">
               <p className="font-black text-white text-sm leading-tight drop-shadow-md truncate">{shift?.clinic?.full_name || 'Clínica'}</p>

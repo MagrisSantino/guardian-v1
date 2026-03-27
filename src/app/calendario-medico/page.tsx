@@ -377,10 +377,30 @@ function CalendarioMedicoContent() {
       .eq('id', session.user.id)
       .single()
 
-    const { data: openShifts } = await supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('status', 'open')
-    const { data: myShifts } = await supabase.from('shifts').select('*, clinic:profiles!clinic_id(full_name)').eq('professional_id', session.user.id)
-    const { data: appsData } = await supabase.from('shift_applications').select('shift_id').eq('professional_id', session.user.id).eq('status', 'pending')
-    const { data: confirmedData } = await supabase.from('shifts').select('id, date_time, duration_hours').eq('professional_id', session.user.id).eq('status', 'filled')
+    const { data: openShifts } = await supabase
+      .from('shifts')
+      .select('*, clinic:profiles!clinic_id(full_name)')
+      .eq('status', 'open')
+      .order('date_time', { ascending: true })
+      .limit(50)
+    const { data: myShifts } = await supabase
+      .from('shifts')
+      .select('*, clinic:profiles!clinic_id(full_name)')
+      .eq('professional_id', session.user.id)
+      .order('date_time', { ascending: true })
+      .limit(200)
+    const { data: appsData } = await supabase
+      .from('shift_applications')
+      .select('shift_id')
+      .eq('professional_id', session.user.id)
+      .eq('status', 'pending')
+      .order('id', { ascending: false })
+    const { data: confirmedData } = await supabase
+      .from('shifts')
+      .select('id, date_time, duration_hours')
+      .eq('professional_id', session.user.id)
+      .eq('status', 'filled')
+      .order('date_time', { ascending: true })
 
     const blocked = Array.isArray(profile?.blocked_dates) ? profile.blocked_dates : []
     setBlockedDates(blocked)

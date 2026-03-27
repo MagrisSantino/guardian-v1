@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { format, differenceInHours, parseISO } from 'date-fns'
 import { AlertCircle, MessageCircle, X, CalendarDays, Clock, MapPin } from 'lucide-react'
@@ -142,9 +143,16 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
         <div className="absolute top-0 left-0 w-full md:w-1 md:h-full h-1 bg-gradient-to-r md:bg-gradient-to-b from-blue-600 to-blue-400 z-10" />
 
         {/* ── FOTO PORTADA: arriba mobile, izquierda desktop ── */}
-        <div className="relative h-52 md:h-auto md:w-60 lg:w-72 shrink-0">
+        <div className="relative h-52 md:min-h-[260px] md:w-60 lg:w-72 shrink-0 overflow-hidden">
           {coverUrl ? (
-            <img src={coverUrl} alt={shift.clinic?.full_name} className="w-full h-full object-cover" />
+            <Image
+              src={coverUrl}
+              alt={shift.clinic?.full_name || 'Clínica'}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 288px"
+              unoptimized
+            />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-blue-700 via-blue-500 to-slate-600" />
           )}
@@ -152,8 +160,12 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
 
           {/* Avatar + nombre */}
           <div className="absolute bottom-4 left-4 right-4 flex items-end gap-3">
-            <div className="w-11 h-11 rounded-xl border-2 border-white bg-slate-100 overflow-hidden shrink-0 shadow-md">
-              {avatarUrl ? <img src={avatarUrl} alt="Logo" className="w-full h-full object-cover" /> : <span className="text-2xl flex items-center justify-center h-full">🏥</span>}
+            <div className="relative w-11 h-11 rounded-xl border-2 border-white bg-slate-100 overflow-hidden shrink-0 shadow-md">
+              {avatarUrl ? (
+                <Image src={avatarUrl} alt="Logo" fill className="object-cover" sizes="44px" unoptimized />
+              ) : (
+                <span className="text-2xl flex items-center justify-center h-full">🏥</span>
+              )}
             </div>
             <div className="min-w-0">
               <p className="font-black text-white text-sm leading-tight drop-shadow-md truncate">{shift.clinic?.full_name || 'Clínica'}</p>
