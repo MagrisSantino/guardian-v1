@@ -16,9 +16,8 @@ import {
   isSameDay,
   eachDayOfInterval,
   parseISO,
-  addHours,
-  subHours,
 } from 'date-fns'
+import { hasIncompatibleAssignedShift, type AssignedShiftBlock } from '@/lib/shiftOverlap'
 import { es } from 'date-fns/locale'
 import { useSearchParams, usePathname, useRouter } from 'next/navigation'
 import {
@@ -344,16 +343,17 @@ function CalendarioMedicoContent() {
   const [selectedShiftForModal, setSelectedShiftForModal] = useState<any | null>(null)
 
   function checkOverlap(shiftDate: Date, durationHours: number, excludeShiftId?: string): boolean {
-    const shiftEnd = addHours(shiftDate, durationHours)
-    for (const c of myConfirmedShifts) {
-      if (excludeShiftId && c.id === excludeShiftId) continue
-      const confStart = parseISO(c.date_time)
-      const confEnd = addHours(confStart, c.duration_hours ?? 0)
-      const marginStart = subHours(confStart, 12)
-      const marginEnd = addHours(confEnd, 12)
-      if (shiftDate <= marginEnd && marginStart <= shiftEnd) return true
-    }
-    return false
+    const blocks: AssignedShiftBlock[] = myConfirmedShifts.map((c) => ({
+      id: c.id,
+      date_time: c.date_time,
+      duration_hours: c.duration_hours ?? null,
+    }))
+    return hasIncompatibleAssignedShift(
+      shiftDate,
+      durationHours,
+      blocks,
+      excludeShiftId ?? '',
+    )
   }
 
   const searchParams = useSearchParams()

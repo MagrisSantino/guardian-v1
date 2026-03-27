@@ -109,6 +109,19 @@ export default function ExplorarGuardiaModal({
     const { data: { session } } = await supabase.auth.getSession()
     await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: session?.user.id, status: 'pending' }])
     if (clinicId) await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Nueva Postulación! 👨‍⚕️', message: `Un médico se postula a tu guardia: ${shift.title}.` }])
+
+    // Notificación en segundo plano (sin bloquear la UI)
+    void fetch('/api/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'NEW_APPLICATION',
+        shift_id: shift.id,
+        professional_id: session?.user.id,
+        clinic_id: clinicId || null,
+      }),
+    }).catch(() => {})
+
     setHasApplied(true); alert('¡Postulación enviada!'); onRefresh?.(); onClose()
   }
 

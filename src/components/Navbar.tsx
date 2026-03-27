@@ -410,13 +410,15 @@ export default function Navbar() {
                         </Link>
                       </>
                     )}
-                    <Link href="/perfil" className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/perfil' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
-                      <User className="h-4 w-4" />
-                      Mi Perfil
-                      {(isVerified === false || (role === 'doctor' && !profileWhatsapp)) && (
-                        <span className="absolute -top-1 -right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-hidden />
-                      )}
-                    </Link>
+                    {role !== 'clinic_admin' && (
+                      <Link href="/perfil" className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/perfil' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
+                        <User className="h-4 w-4" />
+                        Mi Perfil
+                        {(isVerified === false || (role === 'doctor' && !profileWhatsapp)) && (
+                          <span className="absolute -top-1 -right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" aria-hidden />
+                        )}
+                      </Link>
+                    )}
                   </nav>
                   <div className="my-3 border-t border-slate-200" />
                   <div className="flex flex-col gap-2">

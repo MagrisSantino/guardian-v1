@@ -72,6 +72,7 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
     }
 
     const { data: { session } } = await supabase.auth.getSession()
+    const clinicId = session?.user.id
     const durationHours = durationPreset === 'Otro'
       ? (parseFloat(durationHoursCustom) || 0)
       : durationPreset
@@ -80,7 +81,7 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
     const title = `${shiftCategory} de ${specialtyRequired}`
 
     const insertPayload: Record<string, unknown> = {
-      clinic_id: session?.user.id,
+      clinic_id: clinicId,
       title,
       shift_category: shiftCategory,
       specialty_required: specialtyRequired,
@@ -93,12 +94,29 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
       status: 'open'
     }
 
-    const { error } = await supabase.from('shifts').insert([insertPayload])
+    const { data: inserted, error } = await supabase
+      .from('shifts')
+      .insert([insertPayload])
+      .select('id')
+      .single()
 
     setLoading(false)
     if (error) {
       alert('Error: ' + error.message)
     } else {
+      const shiftId = inserted?.id
+      if (shiftId) {
+        // Notificación en segundo plano (sin bloquear la UI)
+        void fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'NEW_SHIFT',
+            shift_id: shiftId,
+            clinic_id: clinicId,
+          }),
+        }).catch(() => {})
+      }
       alert('Guardia publicada exitosamente')
       onRefresh()
       onClose()

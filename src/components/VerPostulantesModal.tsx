@@ -61,7 +61,7 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
 
   useEffect(() => {
     fetchApplications()
-  }, [])
+  }, [shift?.id])
 
   useEffect(() => {
     if (selectedApp) {
@@ -70,6 +70,7 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
   }, [selectedApp])
 
   async function fetchApplications() {
+    setLoading(true)
     const { data } = await supabase
       .from('shift_applications')
       .select('*, professional:profiles!professional_id(*)')
@@ -97,34 +98,21 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
     if (!confirm('¿Estás seguro de asignar la guardia a este profesional?')) return
     setLoading(true)
 
-    await supabase.from('shifts').update({ status: 'filled', professional_id: professionalId }).eq('id', shift.id)
-    await supabase.from('shift_applications').update({ status: 'accepted' }).eq('id', applicationId)
-    await supabase.from('shift_applications').update({ status: 'rejected' }).eq('shift_id', shift.id).eq('status', 'pending')
+    const res = await fetch('/api/shifts/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        shift_id: shift.id,
+        application_id: applicationId,
+        professional_id: professionalId,
+      }),
+    })
 
-    // Notificación al ganador
-    await supabase.from('notifications').insert([{
-      user_id: professionalId,
-      shift_id: shift.id,
-      title: '¡Guardia Asignada!',
-      message: 'La clínica te ha asignado la guardia.'
-    }])
-
-    // Notificaciones a los rechazados (demás postulantes a esta guardia)
-    const { data: rejectedApps } = await supabase
-      .from('shift_applications')
-      .select('professional_id')
-      .eq('shift_id', shift.id)
-      .neq('professional_id', professionalId)
-    const rejectedIds = (rejectedApps || []).map((r: { professional_id: string }) => r.professional_id)
-    if (rejectedIds.length > 0) {
-      await supabase.from('notifications').insert(
-        rejectedIds.map((user_id: string) => ({
-          user_id,
-          shift_id: shift.id,
-          title: 'Guardia Cubierta',
-          message: 'La guardia a la que te postulaste ya fue cubierta por otro profesional.'
-        }))
-      )
+    const payload = await res.json().catch(() => ({}))
+    if (!res.ok || !payload?.ok) {
+      alert(typeof payload?.error === 'string' ? payload.error : 'No se pudo asignar la guardia.')
+      setLoading(false)
+      return
     }
 
     alert('¡Médico asignado correctamente!')

@@ -278,6 +278,8 @@ export default function RegistroPage() {
   const [cuit, setCuit] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [aceptaTerminos, setAceptaTerminos] = useState(false)
+  const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
   const router = useRouter()
 
@@ -334,6 +336,10 @@ export default function RegistroPage() {
     return true
   }
 
+  function normalizeWhatsAppInput(raw: string): string {
+    return raw.replace(/[^\d]/g, '')
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setCheckingSession(false)
@@ -356,6 +362,14 @@ export default function RegistroPage() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    if (!aceptaTerminos || !aceptaPrivacidad) {
+      setError(
+        'Debes aceptar los Términos y la Política de Privacidad para continuar'
+      )
+      return
+    }
+
     setLoading(true)
 
     if (password !== confirmPassword) {
@@ -372,6 +386,8 @@ export default function RegistroPage() {
       return
     }
 
+    const normalizedWhatsapp = normalizeWhatsAppInput(phone)
+
     const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -379,7 +395,7 @@ export default function RegistroPage() {
         data: {
           full_name: role === 'clinic_admin' ? institutionName : name,
           admin_name: role === 'clinic_admin' ? adminName : null,
-          whatsapp: phone || null,
+          whatsapp: normalizedWhatsapp || null,
           location_maps: role === 'clinic_admin' ? address : null,
           role,
           dni: role === 'doctor' ? dni : null,
@@ -697,6 +713,51 @@ export default function RegistroPage() {
                         </p>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {step === 3 && (
+                  <div className="mt-6 space-y-3">
+                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 transition-colors hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={aceptaTerminos}
+                        onChange={(e) => setAceptaTerminos(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
+                      />
+                      <span className="text-sm leading-snug text-slate-600">
+                        He leído y acepto los{' '}
+                        <a
+                          href="/legales/terminos-condiciones.pdf"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-blue-600 underline decoration-blue-600/30 underline-offset-2 transition-colors hover:text-blue-700"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Términos y Condiciones
+                        </a>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 transition-colors hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={aceptaPrivacidad}
+                        onChange={(e) => setAceptaPrivacidad(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
+                      />
+                      <span className="text-sm leading-snug text-slate-600">
+                        He leído y acepto la{' '}
+                        <a
+                          href="/legales/politica-privacidad.pdf"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-blue-600 underline decoration-blue-600/30 underline-offset-2 transition-colors hover:text-blue-700"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Política de Privacidad
+                        </a>
+                      </span>
+                    </label>
                   </div>
                 )}
 

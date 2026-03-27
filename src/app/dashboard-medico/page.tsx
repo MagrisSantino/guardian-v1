@@ -5,7 +5,8 @@ import ExplorarGuardiaModal from '@/components/ExplorarGuardiaModal'
 import SkeletonGuardia from '@/components/SkeletonGuardia'
 import { FilterBar } from '@/components/FilterBar'
 import { GuardiaCard } from '@/components/GuardiaCard'
-import { format, parseISO, addHours, subHours } from 'date-fns'
+import { format, parseISO } from 'date-fns'
+import { hasIncompatibleAssignedShift, type AssignedShiftBlock } from '@/lib/shiftOverlap'
 import { es } from 'date-fns/locale'
 import { Activity, CalendarDays, Ambulance } from 'lucide-react'
 
@@ -46,16 +47,17 @@ export default function DashboardMedico() {
   })
 
   function checkOverlap(shiftDate: Date, durationHours: number, excludeShiftId?: string): boolean {
-    const shiftEnd = addHours(shiftDate, durationHours)
-    for (const c of myConfirmedShifts) {
-      if (excludeShiftId && c.id === excludeShiftId) continue
-      const confStart = parseISO(c.date_time)
-      const confEnd = addHours(confStart, c.duration_hours ?? 0)
-      const marginStart = subHours(confStart, 12)
-      const marginEnd = addHours(confEnd, 12)
-      if (shiftDate <= marginEnd && marginStart <= shiftEnd) return true
-    }
-    return false
+    const blocks: AssignedShiftBlock[] = myConfirmedShifts.map((c) => ({
+      id: c.id,
+      date_time: c.date_time,
+      duration_hours: c.duration_hours ?? null,
+    }))
+    return hasIncompatibleAssignedShift(
+      shiftDate,
+      durationHours,
+      blocks,
+      excludeShiftId ?? '',
+    )
   }
 
   useEffect(() => { 
@@ -110,6 +112,18 @@ export default function DashboardMedico() {
         message: `Un profesional se acaba de postular a tu guardia: ${shift.title}.`
       }])
     }
+
+    // Notificación en segundo plano (sin bloquear la UI)
+    void fetch('/api/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'NEW_APPLICATION',
+        shift_id: shiftId,
+        professional_id: session?.user.id,
+        clinic_id: shift?.clinic_id || null,
+      }),
+    }).catch(() => {})
 
     alert('¡Postulación enviada a la clínica con éxito!')
     

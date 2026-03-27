@@ -104,6 +104,19 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     if (clinicId) {
       await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Baja de Profesional! ⚠️', message: `El médico se dio de baja de "${shift.title}". Vuelve a estar abierta.` }])
     }
+
+    // Notificación en segundo plano (sin bloquear la UI)
+    void fetch('/api/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'DOCTOR_CANCELLED',
+        shift_id: shift.id,
+        professional_id: session?.user.id,
+        clinic_id: clinicId || null,
+      }),
+    }).catch(() => {})
+
     alert('Guardia cancelada.'); onRefresh(); onClose()
   }
 
