@@ -1,5 +1,0 @@
-import { handleAuthCallback } from '../auth-callback-logic'
-
-export async function GET(request: Request) {
-  return handleAuthCallback(request)
-}

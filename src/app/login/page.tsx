@@ -256,8 +256,20 @@ function LoginPageInner() {
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) { setCheckingSession(false); return }
+
+      // Si el usuario llegó desde la confirmación de email o el reset de contraseña,
+      // cerramos la sesión que Supabase creó automáticamente para que deba ingresar
+      // sus credenciales. (El callback ya hizo signOut; esto es red de seguridad.)
+      const verified = searchParams?.get('verified')
+      const reset    = searchParams?.get('reset')
+      if (verified === 'true' || reset === 'true') {
+        await supabase.auth.signOut()
+        setCheckingSession(false)
+        return
+      }
+
       setCheckingSession(false)
-      if (!session) return
       await ensureProfileExists()
       supabase
         .from('profiles')
@@ -271,7 +283,7 @@ function LoginPageInner() {
           }
         })
     })
-  }, [])
+  }, [searchParams])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

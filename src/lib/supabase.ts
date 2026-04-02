@@ -9,11 +9,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-// Sesión en cookies para el middleware (SSR).
+// Cliente singleton — sesión guardada en cookies para que el middleware la lea.
 export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
 
-// createBrowserClient fuerza flowType "pkce"; con PKCE el enlace de confirmación trae ?code= y el
-// intercambio exige el code_verifier guardado en **ese mismo navegador**. Si el usuario se registra
-// en la PC y abre el mail en el celular, falla. Con "implicit" no se manda code_challenge al
-// signup/recover y el mail redirige con token_hash en query, que /auth/callback resuelve en servidor.
-;(supabase.auth as unknown as { flowType: 'implicit' | 'pkce' }).flowType = 'implicit'
+/**
+ * createBrowserClient fuerza flowType='pkce'. Con PKCE, el link de confirmación
+ * lleva ?code= que solo puede canjearse en el navegador original (el code_verifier
+ * está en sus cookies). Si se abre el mail en otro dispositivo, falla.
+ *
+ * Cambiando a 'implicit' el signup/resetPasswordForEmail no envían code_challenge
+ * a GoTrue, así que el mail redirige con #access_token=... o ?token_hash=...,
+ * ambos formatos que funcionan desde cualquier dispositivo.
+ *
+ * La mutación es segura: ocurre antes de que initialize() lea flowType,
+ * ya que la adquisición del lock (Web Locks API o lockNoOp) siempre cede
+ * el hilo de JS antes de ejecutar _initialize().
+ */
+;(supabase.auth as unknown as { flowType: string }).flowType = 'implicit'
