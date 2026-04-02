@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { AlertCircle, Activity, CalendarDays, Ambulance, MapPin, Clock, DollarSign, Briefcase, X } from 'lucide-react'
 import { GoogleMap, Marker, useLoadScript } from '@react-google-maps/api'
+import { GENERAL_SPECIALTIES } from '@/lib/specialties'
 
 const CBA_CAPITAL = { lat: -31.4201, lng: -64.1888 }
 
@@ -48,6 +49,19 @@ export default function ExplorarGuardiaModal({
   // Verificación: leemos caché de sessionStorage para evitar el flash "Verificando"
   const cachedVerified = typeof window !== 'undefined' ? sessionStorage.getItem('medico_is_verified') : null
   const [isVerified, setIsVerified] = useState(cachedVerified === 'true')
+
+  // Especialidades del médico (objetos {name, verified}) para gate por especialidad
+  const doctorSpecialties: {name: string; verified: boolean}[] = (() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const cached = sessionStorage.getItem('medico_specialties_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed)) return parsed
+      }
+    } catch {}
+    return []
+  })()
   const [checkingAuth, setCheckingAuth] = useState(cachedVerified === null) // solo spinner si no hay caché
   const [hasApplied, setHasApplied] = useState(hasAppliedProp ?? false)
   const [clinicProfile, setClinicProfile] = useState<{
@@ -308,17 +322,38 @@ export default function ExplorarGuardiaModal({
                     Retirar Postulación
                   </button>
                 </div>
-              ) : isVerified ? (
-                <button onClick={handleApply} disabled={loading || hasOverlap} className="w-full bg-slate-900 hover:bg-blue-700 text-white py-3 rounded-xl font-black text-sm transition-all shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
-                  {loading || loadingBtn === shift?.id ? 'Procesando...' : 'Postularme a esta Guardia'}
-                </button>
-              ) : (
-                <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
-                  <AlertCircle className="w-6 h-6 text-red-500 mx-auto mb-1" />
-                  <p className="text-red-700 font-bold text-xs">Perfil no verificado</p>
-                  <p className="text-red-600/80 text-[11px] mt-0.5">Completá tu perfil para postularte.</p>
-                </div>
-              )}
+              ) : (() => {
+                if (!isVerified) {
+                  return (
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+                      <AlertCircle className="w-6 h-6 text-red-500 mx-auto mb-1" />
+                      <p className="text-red-700 font-bold text-xs">Perfil no verificado</p>
+                      <p className="text-red-600/80 text-[11px] mt-0.5">Completá tu perfil para postularte.</p>
+                    </div>
+                  )
+                }
+                const shiftSpecialty = shift?.specialty_required
+                const isGeneralShift = !shiftSpecialty || GENERAL_SPECIALTIES.has(shiftSpecialty)
+                const hasVerifiedSpecialty = isGeneralShift || doctorSpecialties.some(
+                  s => s.name === shiftSpecialty && s.verified
+                )
+                if (!hasVerifiedSpecialty) {
+                  return (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                      <AlertCircle className="w-6 h-6 text-amber-500 mx-auto mb-1" />
+                      <p className="text-amber-800 font-bold text-xs">Especialidad pendiente de verificación</p>
+                      <p className="text-amber-700/80 text-[11px] mt-0.5">
+                        Tu especialidad <strong>{shiftSpecialty}</strong> aún no fue validada por el equipo de Guardian. Una vez aprobada podrás postularte.
+                      </p>
+                    </div>
+                  )
+                }
+                return (
+                  <button onClick={handleApply} disabled={loading || hasOverlap} className="w-full bg-slate-900 hover:bg-blue-700 text-white py-3 rounded-xl font-black text-sm transition-all shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+                    {loading || loadingBtn === shift?.id ? 'Procesando...' : 'Postularme a esta Guardia'}
+                  </button>
+                )
+              })()}
               <button onClick={onClose} className="w-full text-slate-400 hover:text-slate-700 font-bold text-xs py-1.5 transition-colors uppercase tracking-widest">Cerrar</button>
             </div>
           </div>

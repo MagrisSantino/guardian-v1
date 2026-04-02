@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import AppNavbarWrapper from "@/components/AppNavbarWrapper";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -10,11 +11,11 @@ const inter = Inter({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#1a1f4b",
+  themeColor: "#2563eb",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Evita zoom accidental en inputs en celular
+  userScalable: false,
 };
 
 export const metadata: Metadata = {
@@ -28,8 +29,13 @@ export const metadata: Metadata = {
     title: "Guardian",
   },
   icons: {
-    icon: "/icon-512.png",
-    apple: "/icon-512.png",
+    icon: [
+      { url: "/icon-48.png",  sizes: "48x48",   type: "image/png" },
+      { url: "/icon-96.png",  sizes: "96x96",   type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/icon-180.png",
   },
   formatDetection: {
     telephone: false,
@@ -44,6 +50,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="scroll-smooth">
       <body className={`${inter.variable} font-sans antialiased bg-background text-foreground selection:bg-primary/20`}>
+        <ServiceWorkerRegister />
         <AppNavbarWrapper />
         {children}
       </body>

@@ -1,9 +1,35 @@
 'use client'
 
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, MailCheck } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { ArrowLeft, MailCheck, RefreshCw } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
-export default function VerificarEmailPage() {
+function VerificarEmailContent() {
+  const searchParams = useSearchParams()
+  const emailParam = searchParams?.get('email') ?? ''
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendMsg, setResendMsg] = useState('')
+
+  async function handleResend() {
+    setResendLoading(true)
+    setResendMsg('')
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: emailParam,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    setResendLoading(false)
+    if (error) {
+      setResendMsg('No se pudo reenviar el correo: ' + error.message)
+    } else {
+      setResendMsg('¡Correo reenviado! Revisá tu bandeja de entrada y la carpeta de Spam.')
+    }
+  }
+
   return (
     <div className="relative min-h-screen bg-slate-50 overflow-hidden">
       <div
@@ -32,21 +58,53 @@ export default function VerificarEmailPage() {
                 ¡Casi listo!
               </h1>
               <p className="mt-3 text-center text-sm text-slate-600 leading-relaxed">
-                Hemos enviado un enlace de confirmación a tu correo. Por favor,
-                hacé clic en el enlace para activar tu cuenta. No olvides
-                revisar la carpeta de Spam.
+                Hemos enviado un enlace de confirmación a tu correo. Hacé clic
+                en el enlace para activar tu cuenta. No olvides revisar la
+                carpeta de Spam.
               </p>
-              <Link
-                href="/login"
-                className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 hover:shadow-blue-700/30 active:scale-[0.98]"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Volver a iniciar sesión
-              </Link>
+
+              {resendMsg && (
+                <p className={`mt-4 rounded-xl border px-4 py-3 text-center text-sm ${
+                  resendMsg.startsWith('¡')
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-red-200 bg-red-50 text-red-800'
+                }`}>
+                  {resendMsg}
+                </p>
+              )}
+
+              <div className="mt-6 flex flex-col gap-3">
+                {emailParam && (
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={resendLoading}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-6 py-3 text-sm font-semibold text-blue-700 transition-all hover:bg-blue-100 disabled:pointer-events-none disabled:opacity-60"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${resendLoading ? 'animate-spin' : ''}`} />
+                    Reenviar correo de verificación
+                  </button>
+                )}
+                <Link
+                  href="/login"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 hover:shadow-blue-700/30 active:scale-[0.98]"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Volver a iniciar sesión
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </main>
     </div>
+  )
+}
+
+export default function VerificarEmailPage() {
+  return (
+    <Suspense>
+      <VerificarEmailContent />
+    </Suspense>
   )
 }

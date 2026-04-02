@@ -6,6 +6,7 @@ import {
   sendNuevaGuardiaPublicadaEmail,
   sendNuevaPostulacionEmail,
 } from '@/lib/mailer'
+import { GENERAL_SPECIALTIES } from '@/lib/specialties'
 
 type NotificationAction =
   | 'NEW_SHIFT'
@@ -19,6 +20,7 @@ type ProfilesRow = {
   full_name: string | null
   admin_name: string | null
   is_verified: boolean | null
+  specialty?: string | null
 }
 
 type ShiftRow = {
@@ -57,10 +59,16 @@ function maskEmail(email: string): string {
   return `${prefix}@${domain}`
 }
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error(
+    'Faltan variables de entorno: NEXT_PUBLIC_SUPABASE_URL y/o SUPABASE_SERVICE_ROLE_KEY'
+  )
+}
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 async function getEmailByUserId(userId: string): Promise<string | null> {
   try {
@@ -106,12 +114,36 @@ async function getProfileOrThrow(profileId: string): Promise<ProfilesRow> {
 async function getVerifiedDoctors(): Promise<ProfilesRow[]> {
   const { data, error } = await supabaseAdmin
     .from('profiles')
-    .select('id,role,full_name,admin_name,is_verified')
+    .select('id,role,full_name,admin_name,is_verified,specialty')
     .eq('role', 'doctor')
     .eq('is_verified', true)
 
   if (error) throw new Error(`Error consultando médicos verificados: ${error.message}`)
   return (data ?? []) as unknown as ProfilesRow[]
+}
+
+/**
+ * Determina si un médico debe recibir el mail de una guardia con la especialidad dada.
+ * - Guardias generales (Generalista, Médico Clínico, Medicina de Emergencias): todos los médicos verificados.
+ * - Guardias con especialidad específica: solo médicos que tengan esa especialidad en su perfil
+ *   (con verified=true, o sin campo verified para compatibilidad con registros previos).
+ */
+function doctorMatchesSpecialty(doctor: ProfilesRow, shiftSpecialty: string | null): boolean {
+  if (!shiftSpecialty || GENERAL_SPECIALTIES.has(shiftSpecialty)) return true
+
+  if (!doctor.specialty) return false
+  try {
+    const specialties = JSON.parse(doctor.specialty)
+    if (!Array.isArray(specialties)) return false
+    return specialties.some(
+      (s: any) =>
+        String(s?.name ?? '') === shiftSpecialty &&
+        // Si el campo verified no existe (registro pre-implementación) lo consideramos válido
+        (s?.verified === true || s?.verified === undefined)
+    )
+  } catch {
+    return false
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -149,9 +181,10 @@ export async function POST(request: NextRequest) {
       const clinicProfile = await getProfileOrThrow(shift.clinic_id)
       const clinicName = clinicProfile.full_name || null
 
-      const doctors = await getVerifiedDoctors()
+      const allDoctors = await getVerifiedDoctors()
+      const doctors = allDoctors.filter(doc => doctorMatchesSpecialty(doc, shift.specialty_required))
       console.log(
-        `[notifications] NEW_SHIFT: ${doctors.length} médico(s) verificado(s) → intentando enviar correo a cada uno (hay email en Auth)`,
+        `[notifications] NEW_SHIFT: ${doctors.length}/${allDoctors.length} médico(s) coinciden con especialidad "${shift.specialty_required ?? 'general'}" → enviando correos`,
       )
       for (const doc of doctors) {
         tasks.push((async () => {

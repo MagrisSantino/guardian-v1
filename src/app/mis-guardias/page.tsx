@@ -12,8 +12,15 @@ import DetalleGuardiaMedicoModal from '@/components/DetalleGuardiaMedicoModal'
 export default function MisGuardiasPage() {
   const [myGuardias, setMyGuardias] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('mis_guardias_cache')
-      return cached ? JSON.parse(cached) : []
+      try {
+        const cached = sessionStorage.getItem('mis_guardias_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        sessionStorage.removeItem('mis_guardias_cache')
+      }
     }
     return []
   })

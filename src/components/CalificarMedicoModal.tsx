@@ -26,25 +26,54 @@ export default function CalificarMedicoModal({ onClose, onRefresh, shift }: any)
     e.preventDefault()
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return;
+    if (!session) {
+      setLoading(false)
+      return
+    }
 
-    // 1. Insertamos la reseña en la tabla nueva
+    // 1. Insertar la reseña
     const { error: reviewError } = await supabase.from('reviews').insert([{
       shift_id: shift.id,
       reviewer_id: session.user.id,
       reviewed_id: shift.professional_id,
-      rating: rating,
-      comment: comment
+      rating,
+      comment,
     }])
 
     if (reviewError) {
       alert('Error al calificar: ' + reviewError.message)
       setLoading(false)
-      return;
+      return
     }
 
-    // 2. Cambiamos el estado de la guardia a 'completed' para cerrar el ciclo
-    await supabase.from('shifts').update({ status: 'completed' }).eq('id', shift.id)
+    // 2. Recalcular rating del médico en profiles
+    const { data: allReviews } = await supabase
+      .from('reviews')
+      .select('rating')
+      .eq('reviewed_id', shift.professional_id)
+
+    if (allReviews && allReviews.length > 0) {
+      const avg = allReviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / allReviews.length
+      await supabase
+        .from('profiles')
+        .update({
+          rating: Math.round(avg * 100) / 100,
+          reviews_count: allReviews.length,
+        })
+        .eq('id', shift.professional_id)
+    }
+
+    // 3. Marcar la guardia como completada
+    const { error: shiftErr } = await supabase
+      .from('shifts')
+      .update({ status: 'completed' })
+      .eq('id', shift.id)
+
+    if (shiftErr) {
+      alert('Error al finalizar la guardia: ' + shiftErr.message)
+      setLoading(false)
+      return
+    }
 
     setLoading(false)
     alert('¡Calificación enviada! El perfil del profesional ha sido actualizado.')

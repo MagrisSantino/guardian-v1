@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { AlertCircle, Clock, X } from 'lucide-react'
+import { MEDICAL_SPECIALTIES } from '@/lib/specialties'
 
 const HOUR_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   const h = Math.floor(i / 2)
@@ -11,7 +12,6 @@ const HOUR_OPTIONS = Array.from({ length: 48 }, (_, i) => {
 })
 
 const SHIFT_CATEGORY_OPTIONS = ['Guardia', 'Consultorio', 'Ambulancia'] as const
-const SPECIALTY_OPTIONS = ['Generalista', 'Clínico', 'Pediatría', 'Gineco/obstetricia', 'Cirugía general', 'Traumatología', 'Cardiología', 'Urología', 'Otro'] as const
 const DURATION_PILLS = [4, 6, 8, 12, 24, 'Otro'] as const
 
 function getEndTime(start: string, durationHours: number): string {
@@ -25,7 +25,6 @@ function getEndTime(start: string, durationHours: number): string {
 export default function PublicarModal({ onClose, onRefresh, selectedDate = null }: { onClose: () => void; onRefresh: () => void; selectedDate?: Date | null }) {
   const [shiftCategory, setShiftCategory] = useState<'Guardia' | 'Consultorio' | 'Ambulancia'>('Guardia')
   const [specialty, setSpecialty] = useState<string>('Generalista')
-  const [specialtyOther, setSpecialtyOther] = useState('')
   const [date, setDate] = useState('')
   const [timeStart, setTimeStart] = useState('08:00')
   const [durationPreset, setDurationPreset] = useState<4 | 6 | 8 | 12 | 24 | 'Otro'>(8)
@@ -61,21 +60,52 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!isVerified) return; // Doble barrera
+    if (!isVerified) return // Doble barrera
     setLoading(true)
 
-    const specialtyRequired = specialty === 'Otro' ? specialtyOther.trim() : specialty
+    const specialtyRequired = specialty
     if (!specialtyRequired) {
       alert('Completá la especialidad requerida.')
       setLoading(false)
       return
     }
 
-    const { data: { session } } = await supabase.auth.getSession()
-    const clinicId = session?.user.id
+    const parsedPrice = parseFloat(price)
+    if (isNaN(parsedPrice) || parsedPrice <= 0 || parsedPrice > 9_999_999) {
+      alert('El precio debe ser un número positivo válido.')
+      setLoading(false)
+      return
+    }
+
     const durationHours = durationPreset === 'Otro'
-      ? (parseFloat(durationHoursCustom) || 0)
+      ? parseFloat(durationHoursCustom)
       : durationPreset
+
+    if (isNaN(durationHours) || durationHours <= 0 || durationHours > 48) {
+      alert('La duración debe estar entre 1 y 48 horas.')
+      setLoading(false)
+      return
+    }
+
+    if (!date) {
+      alert('Seleccioná una fecha para la guardia.')
+      setLoading(false)
+      return
+    }
+    const shiftDateTime = new Date(`${date}T${timeStart}:00`)
+    if (shiftDateTime <= new Date()) {
+      alert('La fecha y hora de la guardia deben ser en el futuro.')
+      setLoading(false)
+      return
+    }
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.')
+      setLoading(false)
+      return
+    }
+    const clinicId = session.user.id
 
     const dateTimeISO = `${date}T${timeStart}:00`
     const title = `${shiftCategory} de ${specialtyRequired}`
@@ -87,7 +117,7 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
       specialty_required: specialtyRequired,
       date_time: dateTimeISO,
       duration_hours: durationHours,
-      price: parseFloat(price),
+      price: parsedPrice,
       viaticos: viaticosExtra,
       payment_timeframe: tiempoAPagar || null,
       description: detallesAdicionales || null,
@@ -178,19 +208,10 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
                 required
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900"
               >
-                {SPECIALTY_OPTIONS.map((opt) => (
+                {MEDICAL_SPECIALTIES.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
-              {specialty === 'Otro' && (
-                <input
-                  type="text"
-                  value={specialtyOther}
-                  onChange={e => setSpecialtyOther(e.target.value)}
-                  placeholder="Escribí la especialidad"
-                  className="mt-2 w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900"
-                />
-              )}
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Fecha</label>

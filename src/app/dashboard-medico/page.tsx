@@ -9,24 +9,39 @@ import { format, parseISO } from 'date-fns'
 import { hasIncompatibleAssignedShift, type AssignedShiftBlock } from '@/lib/shiftOverlap'
 import { es } from 'date-fns/locale'
 import { Activity, CalendarDays, Ambulance } from 'lucide-react'
+import { GENERAL_SPECIALTIES } from '@/lib/specialties'
 
 export default function DashboardMedico() {
   const [shifts, setShifts] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('medico_feed_cache')
-      return cached ? JSON.parse(cached) : []
+      try {
+        const cached = sessionStorage.getItem('medico_feed_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        sessionStorage.removeItem('medico_feed_cache')
+      }
     }
     return []
   })
-  
+
   // --- MAGIA: CACHÉ SÍNCRONO DE POSTULACIONES ---
   const [myApplications, setMyApplications] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('medico_apps_cache')
-      return cached ? JSON.parse(cached) : []
+      try {
+        const cached = sessionStorage.getItem('medico_apps_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        sessionStorage.removeItem('medico_apps_cache')
+      }
     }
     return []
-  }) 
+  })
   
   const [loadingBtn, setLoadingBtn] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -40,10 +55,34 @@ export default function DashboardMedico() {
   const [sortBy, setSortBy] = useState<'recent' | 'price_high' | 'price_low'>('recent')
   const [myConfirmedShifts, setMyConfirmedShifts] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('medico_confirmed_cache')
-      return cached ? JSON.parse(cached) : []
+      try {
+        const cached = sessionStorage.getItem('medico_confirmed_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        sessionStorage.removeItem('medico_confirmed_cache')
+      }
     }
     return []
+  })
+
+  // Especialidades del médico (objetos completos con verified) — para filtrar el feed y el modal
+  // null = todavía no se cargó del server; [] = sin especialidades (ve todo); [...] = lista
+  const [doctorSpecialties, setDoctorSpecialties] = useState<{name: string; verified: boolean}[] | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = sessionStorage.getItem('medico_specialties_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        sessionStorage.removeItem('medico_specialties_cache')
+      }
+    }
+    return null
   })
 
   function checkOverlap(shiftDate: Date, durationHours: number, excludeShiftId?: string): boolean {
@@ -70,39 +109,64 @@ export default function DashboardMedico() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return;
 
-    const { data: shiftsData } = await supabase
-      .from('shifts')
-      .select('*, clinic:profiles!clinic_id(*)')
-      .eq('status', 'open')
-      .order('date_time', { ascending: true })
-      .limit(50)
-    const { data: appsData } = await supabase
-      .from('shift_applications')
-      .select('shift_id')
-      .eq('professional_id', session.user.id)
-      .eq('status', 'pending')
-      .order('id', { ascending: false })
-    const { data: confirmedData } = await supabase
-      .from('shifts')
-      .select('id, date_time, duration_hours')
-      .eq('professional_id', session.user.id)
-      .eq('status', 'filled')
-      .order('date_time', { ascending: true })
+    const [shiftsRes, appsRes, confirmedRes, profileRes] = await Promise.all([
+      supabase
+        .from('shifts')
+        .select('*, clinic:profiles!clinic_id(*)')
+        .eq('status', 'open')
+        .order('date_time', { ascending: true })
+        .limit(50),
+      supabase
+        .from('shift_applications')
+        .select('shift_id')
+        .eq('professional_id', session.user.id)
+        .eq('status', 'pending')
+        .order('id', { ascending: false }),
+      supabase
+        .from('shifts')
+        .select('id, date_time, duration_hours')
+        .eq('professional_id', session.user.id)
+        .eq('status', 'filled')
+        .order('date_time', { ascending: true }),
+      supabase
+        .from('profiles')
+        .select('is_verified, specialty')
+        .eq('id', session.user.id)
+        .single(),
+    ])
 
-    if (shiftsData) {
-      setShifts(shiftsData)
-      sessionStorage.setItem('medico_feed_cache', JSON.stringify(shiftsData))
+    if (shiftsRes.data) {
+      setShifts(shiftsRes.data)
+      sessionStorage.setItem('medico_feed_cache', JSON.stringify(shiftsRes.data))
     }
-    if (appsData) {
-      const apps = appsData.map(a => a.shift_id)
+    if (appsRes.data) {
+      const apps = appsRes.data.map((a: any) => a.shift_id)
       setMyApplications(apps)
       sessionStorage.setItem('medico_apps_cache', JSON.stringify(apps))
     }
-    if (confirmedData) {
-      setMyConfirmedShifts(confirmedData)
-      sessionStorage.setItem('medico_confirmed_cache', JSON.stringify(confirmedData))
+    if (confirmedRes.data) {
+      setMyConfirmedShifts(confirmedRes.data)
+      sessionStorage.setItem('medico_confirmed_cache', JSON.stringify(confirmedRes.data))
     }
-    
+    if (profileRes.data) {
+      const p = profileRes.data
+      sessionStorage.setItem('medico_is_verified', String(p.is_verified === true))
+      // Guardar objetos completos {name, verified} para que el modal pueda decidir por especialidad
+      let specialtyObjects: {name: string; verified: boolean}[] = []
+      if (p.specialty) {
+        try {
+          const parsed = JSON.parse(p.specialty)
+          if (Array.isArray(parsed)) {
+            specialtyObjects = parsed
+              .map((s: any) => ({ name: String(s.name || ''), verified: s.verified === true }))
+              .filter(s => s.name)
+          }
+        } catch {}
+      }
+      setDoctorSpecialties(specialtyObjects)
+      sessionStorage.setItem('medico_specialties_cache', JSON.stringify(specialtyObjects))
+    }
+
     setIsFetching(false)
   }
 
@@ -172,12 +236,21 @@ export default function DashboardMedico() {
   }
 
   const filteredShifts = shifts.filter(shift => {
-    const matchesSearch = (shift.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = (shift.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          shift.clinic?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesSpecialty = selectedSpecialty === 'Todas' || shift.specialty_required === selectedSpecialty;
     if (filterFromDate) {
       const shiftDay = format(parseISO(shift.date_time), 'yyyy-MM-dd');
       if (shiftDay < filterFromDate) return false;
+    }
+    // Filtro por especialidad del médico:
+    // Si el médico tiene especialidades declaradas, solo ve guardias generales + las suyas (verificadas o no).
+    // Si no tiene ninguna (médico general), ve todas.
+    if (doctorSpecialties !== null && doctorSpecialties.length > 0) {
+      const shiftSpecialty = shift.specialty_required
+      const isGeneral = !shiftSpecialty || GENERAL_SPECIALTIES.has(shiftSpecialty)
+      const doctorHasIt = doctorSpecialties.some(s => s.name === shiftSpecialty)
+      if (!isGeneral && !doctorHasIt) return false
     }
     return matchesSearch && matchesSpecialty;
   })

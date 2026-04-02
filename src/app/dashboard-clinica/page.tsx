@@ -133,7 +133,7 @@ function GuardiaCard({
   const status = getGuardiaStatus(shift)
   const config = STATUS_CONFIG[status]
   const shiftDate = parseISO(shift.date_time)
-  const amount = `${Math.round(shift.price / 1000)}k`
+  const amount = shift.price != null ? `${Math.round(shift.price / 1000)}k` : '—'
   const specialty = shift.specialty_required
   const now = new Date()
   const hoursUntil = differenceInHours(shiftDate, now)
@@ -182,7 +182,7 @@ function GuardiaCardMobile({
   const status = getGuardiaStatus(shift)
   const config = STATUS_CONFIG[status]
   const shiftDate = parseISO(shift.date_time)
-  const amount = `${Math.round(shift.price / 1000)}k`
+  const amount = shift.price != null ? `${Math.round(shift.price / 1000)}k` : '—'
   const specialty = shift.specialty_required
   const now = new Date()
   const hoursUntil = differenceInHours(shiftDate, now)
@@ -287,6 +287,7 @@ function DashboardClinicaContent() {
       .select('*, applicants:shift_applications(status)')
       .eq('clinic_id', session.user.id)
       .order('date_time', { ascending: true })
+      .limit(200)
     if (data) setMyShifts(data)
   }
 

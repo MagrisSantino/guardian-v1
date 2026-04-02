@@ -296,16 +296,30 @@ function StatCard({
 function CalendarioMedicoContent() {
   const [shifts, setShifts] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('medico_calendar_cache')
-      return cached ? JSON.parse(cached) : []
+      try {
+        const cached = sessionStorage.getItem('medico_calendar_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        sessionStorage.removeItem('medico_calendar_cache')
+      }
     }
     return []
   })
 
   const [myApplications, setMyApplications] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('medico_apps_cache')
-      return cached ? JSON.parse(cached) : []
+      try {
+        const cached = sessionStorage.getItem('medico_apps_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        sessionStorage.removeItem('medico_apps_cache')
+      }
     }
     return []
   })
@@ -319,22 +333,43 @@ function CalendarioMedicoContent() {
   const [legendOpen, setLegendOpen] = useState(false)
   const [myConfirmedShifts, setMyConfirmedShifts] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('medico_confirmed_cache')
-      return cached ? JSON.parse(cached) : []
+      try {
+        const cached = sessionStorage.getItem('medico_confirmed_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        sessionStorage.removeItem('medico_confirmed_cache')
+      }
     }
     return []
   })
   const [blockedDates, setBlockedDates] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('medico_blocked_cache')
-      return cached ? JSON.parse(cached) : []
+      try {
+        const cached = sessionStorage.getItem('medico_blocked_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        sessionStorage.removeItem('medico_blocked_cache')
+      }
     }
     return []
   })
   const [selectedBlockedDates, setSelectedBlockedDates] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('medico_blocked_cache')
-      return cached ? JSON.parse(cached) : []
+      try {
+        const cached = sessionStorage.getItem('medico_blocked_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        sessionStorage.removeItem('medico_blocked_cache')
+      }
     }
     return []
   })

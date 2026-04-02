@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
   ArrowLeft,
@@ -70,6 +71,7 @@ interface LoginFormProps {
   setShowPassword: (v: boolean) => void
   loading: boolean
   onSubmit: (e: React.FormEvent) => void
+  onForgotPassword: () => void
 }
 
 function LoginForm({
@@ -81,6 +83,7 @@ function LoginForm({
   setShowPassword,
   loading,
   onSubmit,
+  onForgotPassword,
 }: LoginFormProps) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-5">
@@ -109,7 +112,13 @@ function LoginForm({
           <label htmlFor="password" className="text-[13px] font-semibold text-slate-700">
             Contraseña
           </label>
-          <span className="text-xs font-medium text-slate-400">Olvidaste tu contraseña?</span>
+          <button
+            type="button"
+            onClick={onForgotPassword}
+            className="text-xs font-medium text-blue-500 transition-colors hover:text-blue-700"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
         </div>
         <div className="relative">
           <div className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-slate-400">
@@ -170,13 +179,51 @@ function LoginForm({
   )
 }
 
-export default function LoginPage() {
+function LoginPageInner() {
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [loginError, setLoginError] = useState('')
+  const [loginError, setLoginError] = useState(() => {
+    // Leer ?error= del callback de verificación de email
+    return ''
+  })
+  const [loginSuccess, setLoginSuccess] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
+
+  // Mensajes provenientes del callback de email
+  useEffect(() => {
+    const verified  = searchParams?.get('verified')
+    const reset     = searchParams?.get('reset')
+    const errorParam = searchParams?.get('error')
+    if (verified === 'true') {
+      setLoginSuccess('¡Tu correo fue verificado correctamente! Ya podés iniciar sesión.')
+    } else if (reset === 'true') {
+      setLoginSuccess('¡Tu contraseña fue actualizada con éxito! Iniciá sesión con tu nueva contraseña.')
+    } else if (errorParam === 'invalid_link') {
+      setLoginError('El enlace no es válido o ya fue usado. Solicitá uno nuevo desde el formulario de recuperación.')
+    }
+  }, [searchParams])
+
+  const handleForgotPassword = async () => {
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setLoginError('Ingresá tu correo en el campo de arriba para recuperar la contraseña.')
+      return
+    }
+    setLoading(true)
+    setLoginError('')
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/restablecer-contrasena`,
+    })
+    setLoading(false)
+    if (error) {
+      setLoginError('No se pudo enviar el correo de recuperación: ' + error.message)
+    } else {
+      setLoginSuccess('Te enviamos un enlace para restablecer tu contraseña. Revisá tu correo (y la carpeta de Spam).')
+    }
+  }
 
   function redirectByRole(role: string | null | undefined) {
     if (role === 'super_admin') {
@@ -322,6 +369,14 @@ export default function LoginPage() {
                   {loginError}
                 </div>
               )}
+              {loginSuccess && (
+                <div
+                  role="status"
+                  className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+                >
+                  {loginSuccess}
+                </div>
+              )}
               <LoginForm
                 email={email}
                 setEmail={setEmail}
@@ -331,6 +386,7 @@ export default function LoginPage() {
                 setShowPassword={setShowPassword}
                 loading={loading}
                 onSubmit={handleLogin}
+                onForgotPassword={handleForgotPassword}
               />
             </div>
           </div>
@@ -341,5 +397,13 @@ export default function LoginPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageInner />
+    </Suspense>
   )
 }

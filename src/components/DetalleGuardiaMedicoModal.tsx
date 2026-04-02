@@ -57,7 +57,10 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
 
   async function checkSecurity() {
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    if (!session) {
+      setIsCheckingSecurity(false)
+      return
+    }
     const { data } = await supabase.from('profiles').select('is_verified').eq('id', session.user.id).single()
     setIsVerified(data?.is_verified || false)
     setIsCheckingSecurity(false)
@@ -75,7 +78,8 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     if (hasOverlap) return
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
-    await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: session?.user.id, status: 'pending' }])
+    if (!session) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
+    await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: session.user.id, status: 'pending' }])
     const clinicId = shift.clinic_id || shift.clinic?.id
     if (clinicId) {
       await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Nueva Postulación! 👨‍⚕️', message: `Un médico se postula a tu guardia: ${shift.title}.` }])
@@ -87,7 +91,8 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     if (!confirm('¿Querés retirar tu postulación?')) return
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
-    await supabase.from('shift_applications').delete().eq('shift_id', shift.id).eq('professional_id', session?.user.id)
+    if (!session) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
+    await supabase.from('shift_applications').delete().eq('shift_id', shift.id).eq('professional_id', session.user.id)
     alert('Postulación retirada.'); onRefresh(); onClose()
   }
 
@@ -99,8 +104,9 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     if (!confirm(msg)) return
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
     await supabase.from('shifts').update({ status: 'open', professional_id: null }).eq('id', shift.id)
-    await supabase.from('shift_applications').delete().eq('shift_id', shift.id).eq('professional_id', session?.user.id)
+    await supabase.from('shift_applications').delete().eq('shift_id', shift.id).eq('professional_id', session.user.id)
     const clinicId = shift.clinic_id || shift.clinic?.id
     if (clinicId) {
       await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Baja de Profesional! ⚠️', message: `El médico se dio de baja de "${shift.title}". Vuelve a estar abierta.` }])
@@ -122,12 +128,50 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
   }
 
   async function handleRateClinic(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true)
+    e.preventDefault()
+    setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
-    const { error } = await supabase.from('reviews').insert([{ shift_id: shift.id, reviewer_id: session?.user.id, reviewed_id: shift.clinic_id, rating, comment }])
-    if (error) alert('Error: ' + error.message)
-    else { alert('¡Gracias por calificar!'); onRefresh(); onClose() }
+    if (!session) { setLoading(false); return }
+
+    const clinicId = shift.clinic_id || shift.clinic?.id
+
+    const { error } = await supabase.from('reviews').insert([{
+      shift_id: shift.id,
+      reviewer_id: session.user.id,
+      reviewed_id: clinicId,
+      rating,
+      comment,
+    }])
+
+    if (error) {
+      alert('Error al calificar: ' + error.message)
+      setLoading(false)
+      return
+    }
+
+    // Recalcular rating de la clínica en profiles
+    if (clinicId) {
+      const { data: allReviews } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('reviewed_id', clinicId)
+
+      if (allReviews && allReviews.length > 0) {
+        const avg = allReviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / allReviews.length
+        await supabase
+          .from('profiles')
+          .update({
+            rating: Math.round(avg * 100) / 100,
+            reviews_count: allReviews.length,
+          })
+          .eq('id', clinicId)
+      }
+    }
+
     setLoading(false)
+    alert('¡Gracias por calificar!')
+    onRefresh()
+    onClose()
   }
 
   const location = shift.clinic?.location_maps || shift.clinic?.address || 'Ubicación no especificada'
@@ -202,7 +246,7 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
                 <Clock className="h-4 w-4 text-slate-400 shrink-0" />
                 <div>
                   <p className="text-xs font-bold text-slate-800">{shift.duration_hours ?? '—'} hs</p>
-                  <p className="text-emerald-600 font-black text-sm">${Number(shift.price / 1000).toFixed(0)}k</p>
+                  <p className="text-emerald-600 font-black text-sm">{shift.price != null ? `$${Math.round(shift.price / 1000)}k` : '—'}</p>
                 </div>
               </div>
             </div>

@@ -331,8 +331,10 @@ export default function RegistroPage() {
 
   function validatePassword(pwd: string): boolean {
     if (pwd.length < 8) return false
+    if (pwd.length > 128) return false
     if (!/[A-Z]/.test(pwd)) return false
     if (!/\d/.test(pwd)) return false
+    if (!/[^A-Za-z0-9]/.test(pwd)) return false
     return true
   }
 
@@ -388,7 +390,7 @@ export default function RegistroPage() {
 
     if (!validatePassword(password)) {
       setError(
-        'La contraseña debe tener al menos 8 caracteres, una letra mayúscula y un número.'
+        'La contraseña debe tener al menos 8 caracteres, una letra mayúscula, un número y un carácter especial (ej: @, #, !, %).'
       )
       setLoading(false)
       return
@@ -463,7 +465,7 @@ export default function RegistroPage() {
       }
       return
     }
-    router.replace('/verificar-email')
+    router.replace(`/verificar-email?email=${encodeURIComponent(email)}`)
   }
 
   function handleNext() {
@@ -693,7 +695,7 @@ export default function RegistroPage() {
                         <input
                           id="password"
                           type={showPassword ? 'text' : 'password'}
-                          placeholder="Mín. 8 caracteres, una mayúscula y un número"
+                          placeholder="Mín. 8 caracteres, mayúscula, número y símbolo"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           required

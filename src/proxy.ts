@@ -9,7 +9,9 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith('/registro')) return true
   if (pathname.startsWith('/verificar-email')) return true
   if (pathname.startsWith('/auth/callback')) return true
+  if (pathname.startsWith('/restablecer-contrasena')) return true
   if (pathname.startsWith('/legales')) return true
+  if (pathname.startsWith('/offline')) return true
   return false
 }
 
@@ -27,32 +29,35 @@ function dashboardForRole(role: Role): string {
   return '/login'
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
     request: { headers: request.headers },
   })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
-          response.cookies.set({ name, value: '', ...options })
-        },
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('[proxy] Faltan variables de entorno de Supabase')
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get(name: string) {
+        return request.cookies.get(name)?.value
+      },
+      set(name: string, value: string, options: CookieOptions) {
+        request.cookies.set({ name, value, ...options })
+        response = NextResponse.next({ request: { headers: request.headers } })
+        response.cookies.set({ name, value, ...options })
+      },
+      remove(name: string, options: CookieOptions) {
+        request.cookies.set({ name, value: '', ...options })
+        response = NextResponse.next({ request: { headers: request.headers } })
+        response.cookies.set({ name, value: '', ...options })
       },
     },
-  )
+  })
 
   const pathname = request.nextUrl.pathname
 
@@ -76,7 +81,7 @@ export async function middleware(request: NextRequest) {
   const role = (profile?.role as Role) ?? null
 
   if (profileError) {
-    console.error('[middleware] profiles:', profileError.message)
+    console.error('[proxy] profiles:', profileError.message)
   }
 
   if (!role) {

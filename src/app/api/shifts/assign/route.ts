@@ -21,26 +21,30 @@ export async function POST(request: NextRequest) {
     }
 
     const cookieStore = await cookies()
-    const supabaseAuth = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(list) {
-            try {
-              list.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options),
-              )
-            } catch {
-              /* set desde Route Handler */
-            }
-          },
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        { ok: false, error: 'Configuración del servidor incompleta' },
+        { status: 500 },
+      )
+    }
+    const supabaseAuth = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(list) {
+          try {
+            list.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options),
+            )
+          } catch {
+            /* set desde Route Handler */
+          }
         },
       },
-    )
+    })
 
     const {
       data: { user },

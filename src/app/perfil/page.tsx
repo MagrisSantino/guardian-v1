@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useLoadScript, Autocomplete } from '@react-google-maps/api'
 import { BadgeCheck, AlertCircle, LogOut, Save, User, Camera, Loader2, Trash } from 'lucide-react'
+import { MEDICAL_SPECIALTIES } from '@/lib/specialties'
 
 export default function Perfil() {
   const [profile, setProfile] = useState<any>(null)
@@ -15,10 +16,8 @@ export default function Perfil() {
   const [university, setUniversity] = useState('')
   const [bio, setBio] = useState('')
   const [birthDate, setBirthDate] = useState<string>('')
-  const [specialtiesList, setSpecialtiesList] = useState<{ name: string; matricula: string }[]>([])
+  const [specialtiesList, setSpecialtiesList] = useState<{ name: string; matricula: string; verified?: boolean }[]>([])
   const [experienceList, setExperienceList] = useState<{ place: string; time: string }[]>([])
-  // Flag: el profesional verificado modifico sus especialidades -> requiere nueva revision
-  const [specialtiesModified, setSpecialtiesModified] = useState(false)
   
   // Nuevos estados para la foto de perfil
   const [avatarUrl, setAvatarUrl] = useState<string>('')
@@ -142,6 +141,7 @@ export default function Perfil() {
               parsed.map((item: any) => ({
                 name: String(item?.name ?? ''),
                 matricula: String(item?.matricula ?? ''),
+                verified: item?.verified === true,
               }))
             )
           }
@@ -272,10 +272,6 @@ export default function Perfil() {
   async function handleSave() {
     setSaving(true)
 
-    // Si era verificado y modifico especialidades -> revocar verificacion automaticamente
-    const wasVerified = profile?.is_verified === true
-    const needsReverification = wasVerified && specialtiesModified && profile.role === 'doctor'
-
     const updateData = profile.role === 'doctor'
       ? {
           full_name: fullName,
@@ -288,7 +284,6 @@ export default function Perfil() {
           experience_tags: experienceList.map((exp) => `${exp.place} | ${exp.time}`),
           avatar_url: avatarUrl,
           cover_url: coverUrl,
-          ...(needsReverification ? { is_verified: false } : {}),
         }
       : {
           full_name: fullName,
@@ -309,14 +304,12 @@ export default function Perfil() {
     const { error } = await supabase.from('profiles').update(updateData).eq('id', profile.id)
     setSaving(false)
     if (!error) {
-      if (needsReverification) {
-        alert(
-          'Perfil guardado.\n\nDebido a que modificaste tus especialidades, tu verificacion fue revocada automaticamente.\nNuestro equipo revisara los cambios y te otorgara el Tilde Azul nuevamente a la brevedad.'
-        )
+      const hasPending = specialtiesList.some(s => s.verified === false)
+      if (hasPending) {
+        alert('Perfil actualizado.\n\nTus especialidades nuevas quedaron pendientes de validación. Nuestro equipo las revisará y las aprobará a la brevedad.')
       } else {
         alert('Perfil actualizado correctamente')
       }
-      setSpecialtiesModified(false)
       fetchProfile()
     } else {
       alert('Error al guardar: ' + error.message)
@@ -620,8 +613,7 @@ export default function Perfil() {
                   <button
                     type="button"
                     onClick={() => {
-                      setSpecialtiesList((prev) => [...prev, { name: '', matricula: '' }])
-                      if (isVerified) setSpecialtiesModified(true)
+                      setSpecialtiesList((prev) => [...prev, { name: '', matricula: '', verified: false }])
                     }}
                     className="text-xs font-semibold text-blue-600 hover:text-blue-700"
                   >
@@ -633,63 +625,59 @@ export default function Perfil() {
                     Podes cargar tus especialidades con su matricula correspondiente.
                   </p>
                 )}
-                {isVerified && specialtiesModified && (
-                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 mb-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
-                    <p>
-                      <strong>Atencion:</strong> Al guardar, tu perfil quedara <strong>pendiente de reverificacion</strong>. Nuestro equipo lo revisara a la brevedad y te devolvera el Tilde Azul.
-                    </p>
-                  </div>
-                )}
                 <div className="space-y-3">
                   {specialtiesList.map((spec, index) => (
-                    <div
-                      key={index}
-                      className="grid grid-cols-1 sm:grid-cols-[1.5fr,1.2fr,auto] gap-3 items-center"
-                    >
-                      <input
-                        type="text"
-                        value={spec.name}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          setSpecialtiesList((prev) =>
-                            prev.map((item, i) =>
-                              i === index ? { ...item, name: value } : item
+                    <div key={index} className="space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-[1.5fr,1.2fr,auto] gap-3 items-center">
+                        <select
+                          value={spec.name}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            setSpecialtiesList((prev) =>
+                              prev.map((item, i) =>
+                                i === index ? { ...item, name: value } : item
+                              )
                             )
-                          )
-                          if (isVerified) setSpecialtiesModified(true)
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm text-slate-900"
-                        placeholder="Especialidad (ej: Pediatría)"
-                      />
-                      <input
-                        type="text"
-                        value={spec.matricula}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          setSpecialtiesList((prev) =>
-                            prev.map((item, i) =>
-                              i === index ? { ...item, matricula: value } : item
+                          }}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm text-slate-900"
+                        >
+                          <option value="">Seleccionar especialidad...</option>
+                          {MEDICAL_SPECIALTIES.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={spec.matricula}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            setSpecialtiesList((prev) =>
+                              prev.map((item, i) =>
+                                i === index ? { ...item, matricula: value } : item
+                              )
                             )
-                          )
-                          if (isVerified) setSpecialtiesModified(true)
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm text-slate-900"
-                        placeholder="Matrícula (ej: MP 1234)"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSpecialtiesList((prev) =>
-                            prev.filter((_, i) => i !== index)
-                          )
-                          if (isVerified) setSpecialtiesModified(true)
-                        }}
-                        className="inline-flex items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 p-2"
-                        aria-label="Eliminar especialidad"
-                      >
-                        <Trash className="w-4 h-4" />
-                      </button>
+                          }}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm text-slate-900"
+                          placeholder="Matrícula (ej: MP 1234)"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setSpecialtiesList((prev) => prev.filter((_, i) => i !== index))}
+                          className="inline-flex items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 p-2"
+                          aria-label="Eliminar especialidad"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {spec.verified === true ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                          <BadgeCheck className="w-3.5 h-3.5" /> Especialidad verificada
+                        </span>
+                      ) : spec.verified === false ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+                          <AlertCircle className="w-3.5 h-3.5" /> Pendiente de validación por el equipo
+                        </span>
+                      ) : null}
                     </div>
                   ))}
                 </div>

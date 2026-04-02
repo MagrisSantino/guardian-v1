@@ -123,8 +123,12 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
   }
 
   async function handleDeleteShift() {
-    if (!confirm('¿Eliminar esta guardia definitivamente?')) return
-    await supabase.from('shifts').delete().eq('id', shift.id)
+    if (!confirm('¿Eliminar esta guardia definitivamente? Los postulantes no serán notificados.')) return
+    const { error } = await supabase.from('shifts').delete().eq('id', shift.id)
+    if (error) {
+      alert('Error al eliminar la guardia: ' + error.message)
+      return
+    }
     onRefresh()
     onClose()
   }
@@ -336,7 +340,7 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
             <div className="flex justify-between items-start p-6 pb-4 border-b border-slate-100 shrink-0">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{shift.title}</h2>
-                <p className="text-slate-500 text-sm mt-1">{format(new Date(shift.date_time), 'dd/MM/yyyy HH:mm')}hs | ${shift.price.toLocaleString()}</p>
+                <p className="text-slate-500 text-sm mt-1">{format(new Date(shift.date_time), 'dd/MM/yyyy HH:mm')}hs{shift.price != null ? ` | $${shift.price.toLocaleString()}` : ''}</p>
               </div>
               <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-200 uppercase whitespace-nowrap">
                 {applications.length} Postulantes
