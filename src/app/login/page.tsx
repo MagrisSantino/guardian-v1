@@ -215,7 +215,7 @@ function LoginPageInner() {
     setLoading(true)
     setLoginError('')
     const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/restablecer-contrasena`,
+      redirectTo: `${window.location.origin}/auth/callback`,
     })
     setLoading(false)
     if (error) {

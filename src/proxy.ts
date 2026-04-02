@@ -4,11 +4,14 @@ import { NextResponse, type NextRequest } from 'next/server'
 type Role = 'doctor' | 'clinic_admin' | 'super_admin' | string | null
 
 function isPublicPath(pathname: string): boolean {
+  // Service worker y manifest deben servirse sin redirect (requisito del navegador).
+  if (pathname === '/sw.js' || pathname === '/manifest.json') return true
   if (pathname === '/' || pathname === '') return true
   if (pathname.startsWith('/login')) return true
   if (pathname.startsWith('/registro')) return true
   if (pathname.startsWith('/verificar-email')) return true
   if (pathname.startsWith('/auth/callback')) return true
+  if (pathname.startsWith('/auth/confirm')) return true
   if (pathname.startsWith('/restablecer-contrasena')) return true
   if (pathname.startsWith('/legales')) return true
   if (pathname.startsWith('/offline')) return true
@@ -112,6 +115,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|pdf)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|pdf)$).*)',
   ],
 }
