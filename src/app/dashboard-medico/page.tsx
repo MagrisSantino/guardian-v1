@@ -9,7 +9,6 @@ import { format, parseISO } from 'date-fns'
 import { hasIncompatibleAssignedShift, type AssignedShiftBlock } from '@/lib/shiftOverlap'
 import { es } from 'date-fns/locale'
 import { Activity, CalendarDays, Ambulance } from 'lucide-react'
-import { GENERAL_SPECIALTIES } from '@/lib/specialties'
 
 export default function DashboardMedico() {
   const [shifts, setShifts] = useState<any[]>(() => {
@@ -242,15 +241,6 @@ export default function DashboardMedico() {
     if (filterFromDate) {
       const shiftDay = format(parseISO(shift.date_time), 'yyyy-MM-dd');
       if (shiftDay < filterFromDate) return false;
-    }
-    // Filtro por especialidad del médico:
-    // Si el médico tiene especialidades declaradas, solo ve guardias generales + las suyas (verificadas o no).
-    // Si no tiene ninguna (médico general), ve todas.
-    if (doctorSpecialties !== null && doctorSpecialties.length > 0) {
-      const shiftSpecialty = shift.specialty_required
-      const isGeneral = !shiftSpecialty || GENERAL_SPECIALTIES.has(shiftSpecialty)
-      const doctorHasIt = doctorSpecialties.some(s => s.name === shiftSpecialty)
-      if (!isGeneral && !doctorHasIt) return false
     }
     return matchesSearch && matchesSpecialty;
   })
