@@ -56,10 +56,6 @@ export async function POST() {
       return NextResponse.json({ ok: false, error: profileErr.message }, { status: 500 })
     }
 
-    if (existingProfile) {
-      return NextResponse.json({ ok: true, created: false, role: existingProfile.role })
-    }
-
     const meta = (user.user_metadata ?? {}) as Record<string, unknown>
     const role = mapRole(meta.role)
     const emailPrefix = (user.email ?? '').split('@')[0]?.trim() || 'Usuario'
@@ -70,6 +66,35 @@ export async function POST() {
           meta.admin_name ??
           emailPrefix,
       ).trim() || 'Usuario'
+
+    if (existingProfile) {
+      // Profile exists but role may be null (e.g. created by a DB trigger without metadata).
+      // Patch it so the user can log in normally.
+      if (!existingProfile.role) {
+        const updatePayload: Record<string, unknown> = { role, full_name: fullName }
+        let { error: updateErr } = await supabaseAuth
+          .from('profiles')
+          .update(updatePayload)
+          .eq('id', user.id)
+        if (updateErr && /row-level security|permission denied/i.test(updateErr.message)) {
+          try {
+            const { createSupabaseAdmin } = await import('@/lib/supabaseAdmin')
+            const admin = createSupabaseAdmin()
+            const adminUpdate = await admin.from('profiles').update(updatePayload).eq('id', user.id)
+            updateErr = adminUpdate.error ?? null
+          } catch (fallbackErr) {
+            const msg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
+            console.error('[ensure-profile] fallback admin update failed:', msg)
+          }
+        }
+        if (updateErr) {
+          console.error('[ensure-profile] update failed:', updateErr.message)
+          return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 })
+        }
+        return NextResponse.json({ ok: true, created: false, role })
+      }
+      return NextResponse.json({ ok: true, created: false, role: existingProfile.role })
+    }
 
     const insertPayload: Record<string, unknown> = {
       id: user.id,
