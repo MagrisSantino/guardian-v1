@@ -334,19 +334,32 @@ export default function ExplorarGuardiaModal({
                 }
                 const shiftSpecialty = shift?.specialty_required
                 const isGeneralShift = !shiftSpecialty || GENERAL_SPECIALTIES.has(shiftSpecialty)
-                const hasVerifiedSpecialty = isGeneralShift || doctorSpecialties.some(
-                  s => s.name === shiftSpecialty && s.verified
-                )
-                if (!hasVerifiedSpecialty) {
-                  return (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-                      <AlertCircle className="w-6 h-6 text-amber-500 mx-auto mb-1" />
-                      <p className="text-amber-800 font-bold text-xs">Especialidad pendiente de verificación</p>
-                      <p className="text-amber-700/80 text-[11px] mt-0.5">
-                        Tu especialidad <strong>{shiftSpecialty}</strong> aún no fue validada por el equipo de Guardian. Una vez aprobada podrás postularte.
-                      </p>
-                    </div>
-                  )
+                if (!isGeneralShift) {
+                  const matchingSpec = doctorSpecialties.find(s => s.name === shiftSpecialty)
+                  if (!matchingSpec) {
+                    // El médico no tiene esta especialidad cargada en su perfil
+                    return (
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                        <AlertCircle className="w-6 h-6 text-slate-400 mx-auto mb-1" />
+                        <p className="text-slate-700 font-bold text-xs">Especialidad requerida: {shiftSpecialty}</p>
+                        <p className="text-slate-500 text-[11px] mt-0.5">
+                          Agregá esta especialidad desde tu <a href="/perfil" className="font-semibold text-blue-600 underline underline-offset-2">perfil</a> para poder postularte.
+                        </p>
+                      </div>
+                    )
+                  }
+                  if (!matchingSpec.verified) {
+                    // Tiene la especialidad pero aún no fue verificada por el admin
+                    return (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                        <AlertCircle className="w-6 h-6 text-amber-500 mx-auto mb-1" />
+                        <p className="text-amber-800 font-bold text-xs">Especialidad pendiente de verificación</p>
+                        <p className="text-amber-700/80 text-[11px] mt-0.5">
+                          Tu especialidad <strong>{shiftSpecialty}</strong> aún no fue validada por el equipo de Guardian. Una vez aprobada podrás postularte.
+                        </p>
+                      </div>
+                    )
+                  }
                 }
                 return (
                   <button onClick={handleApply} disabled={loading || hasOverlap} className="w-full bg-slate-900 hover:bg-blue-700 text-white py-3 rounded-xl font-black text-sm transition-all shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
