@@ -3,6 +3,19 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 type Role = 'doctor' | 'clinic_admin' | 'super_admin' | string | null
 
+/** Decodifica el payload JWT y devuelve true si el token es de recuperación de contraseña. */
+function isRecoveryToken(accessToken: string): boolean {
+  try {
+    const b64 = accessToken.split('.')[1]?.replace(/-/g, '+').replace(/_/g, '/')
+    if (!b64) return false
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+    const payload = JSON.parse(atob(padded)) as { amr?: { method?: string }[] }
+    return payload.amr?.some((e) => e.method === 'recovery') ?? false
+  } catch {
+    return false
+  }
+}
+
 function isPublicPath(pathname: string): boolean {
   // Service worker y manifest deben servirse sin redirect (requisito del navegador).
   if (pathname === '/sw.js' || pathname === '/manifest.json') return true
@@ -71,6 +84,17 @@ export async function proxy(request: NextRequest) {
   if (!user) {
     if (!isPublicPath(pathname)) {
       return NextResponse.redirect(new URL('/login', request.url))
+    }
+    return response
+  }
+
+  // Sesión de recuperación de contraseña: solo puede acceder a /restablecer-contrasena.
+  // El callback de email mantiene la sesión activa para que updateUser() funcione,
+  // pero el usuario no debe poder navegar el resto de la app.
+  const { data: sessionData } = await supabase.auth.getSession()
+  if (sessionData.session && isRecoveryToken(sessionData.session.access_token)) {
+    if (!pathname.startsWith('/restablecer-contrasena')) {
+      return NextResponse.redirect(new URL('/restablecer-contrasena', request.url))
     }
     return response
   }
