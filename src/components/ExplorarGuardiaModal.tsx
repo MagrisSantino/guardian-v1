@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { AlertCircle, Activity, CalendarDays, Ambulance, MapPin, Clock, DollarSign, Briefcase, X } from 'lucide-react'
 import { GoogleMap, Marker, useLoadScript } from '@react-google-maps/api'
-import { GENERAL_SPECIALTIES } from '@/lib/specialties'
+import { isGeneralSpecialty, specialtiesMatch } from '@/lib/specialties'
 
 const CBA_CAPITAL = { lat: -31.4201, lng: -64.1888 }
 
@@ -333,9 +333,9 @@ export default function ExplorarGuardiaModal({
                   )
                 }
                 const shiftSpecialty = shift?.specialty_required
-                const isGeneralShift = !shiftSpecialty || GENERAL_SPECIALTIES.has(shiftSpecialty)
+                const isGeneralShift = isGeneralSpecialty(shiftSpecialty)
                 if (!isGeneralShift) {
-                  const matchingSpec = doctorSpecialties.find(s => s.name === shiftSpecialty)
+                  const matchingSpec = doctorSpecialties.find(s => specialtiesMatch(s.name, shiftSpecialty))
                   if (!matchingSpec) {
                     // El médico no tiene esta especialidad cargada en su perfil
                     return (

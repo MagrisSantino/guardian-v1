@@ -6,7 +6,7 @@ import {
   sendNuevaGuardiaPublicadaEmail,
   sendNuevaPostulacionEmail,
 } from '@/lib/mailer'
-import { GENERAL_SPECIALTIES } from '@/lib/specialties'
+import { isGeneralSpecialty, specialtiesMatch } from '@/lib/specialties'
 
 type NotificationAction =
   | 'NEW_SHIFT'
@@ -129,7 +129,7 @@ async function getVerifiedDoctors(): Promise<ProfilesRow[]> {
  *   (con verified=true, o sin campo verified para compatibilidad con registros previos).
  */
 function doctorMatchesSpecialty(doctor: ProfilesRow, shiftSpecialty: string | null): boolean {
-  if (!shiftSpecialty || GENERAL_SPECIALTIES.has(shiftSpecialty)) return true
+  if (isGeneralSpecialty(shiftSpecialty)) return true
 
   if (!doctor.specialty) return false
   try {
@@ -137,8 +137,7 @@ function doctorMatchesSpecialty(doctor: ProfilesRow, shiftSpecialty: string | nu
     if (!Array.isArray(specialties)) return false
     return specialties.some(
       (s: any) =>
-        String(s?.name ?? '') === shiftSpecialty &&
-        // Si el campo verified no existe (registro pre-implementación) lo consideramos válido
+        specialtiesMatch(String(s?.name ?? ''), shiftSpecialty!) &&
         (s?.verified === true || s?.verified === undefined)
     )
   } catch {
