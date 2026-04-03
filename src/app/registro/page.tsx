@@ -351,21 +351,26 @@ export default function RegistroPage() {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setCheckingSession(false)
-      if (!session) return
-      supabase
+    // getUser() valida el JWT contra Supabase; evita redirigir con sesiones expiradas/corruptas.
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { setCheckingSession(false); return }
+      const { data: profile } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', session.user.id)
-        .single()
-        .then(({ data: profile }) => {
-          if (profile?.role === 'super_admin')
-            window.location.href = '/super-admin-guardian'
-          else if (profile?.role === 'clinic_admin')
-            window.location.href = '/dashboard-clinica'
-          else window.location.href = '/dashboard-medico'
-        })
+        .eq('id', user.id)
+        .maybeSingle()
+      // Solo redirigir si el perfil tiene un rol válido.
+      // Si no hay rol (perfil incompleto o recién creado), cerrar sesión y mostrar el formulario.
+      if (profile?.role === 'super_admin') {
+        window.location.href = '/super-admin-guardian'
+      } else if (profile?.role === 'clinic_admin') {
+        window.location.href = '/dashboard-clinica'
+      } else if (profile?.role === 'doctor') {
+        window.location.href = '/dashboard-medico'
+      } else {
+        await supabase.auth.signOut()
+        setCheckingSession(false)
+      }
     })
   }, [router])
 

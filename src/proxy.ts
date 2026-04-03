@@ -75,6 +75,16 @@ export async function proxy(request: NextRequest) {
     },
   })
 
+  /**
+   * Los redirects de NextResponse.redirect() no llevan las cookies que
+   * set/remove actualizaron en `response`. Esta helper las copia.
+   */
+  function redirect(url: URL) {
+    const r = NextResponse.redirect(url)
+    response.cookies.getAll().forEach((c) => r.cookies.set(c))
+    return r
+  }
+
   const pathname = request.nextUrl.pathname
 
   const {
@@ -83,7 +93,7 @@ export async function proxy(request: NextRequest) {
 
   if (!user) {
     if (!isPublicPath(pathname)) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return redirect(new URL('/login', request.url))
     }
     return response
   }
@@ -94,7 +104,7 @@ export async function proxy(request: NextRequest) {
   const { data: sessionData } = await supabase.auth.getSession()
   if (sessionData.session && isRecoveryToken(sessionData.session.access_token)) {
     if (!pathname.startsWith('/restablecer-contrasena')) {
-      return NextResponse.redirect(new URL('/restablecer-contrasena', request.url))
+      return redirect(new URL('/restablecer-contrasena', request.url))
     }
     return response
   }
@@ -113,25 +123,36 @@ export async function proxy(request: NextRequest) {
 
   if (!role) {
     if (!isPublicPath(pathname)) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return redirect(new URL('/login', request.url))
+    }
+    return response
+  }
+
+  // Redirigir usuarios autenticados que visitan /login o /registro a su dashboard.
+  // Excepción: si hay query params de post-auth (?verified, ?reset, ?error),
+  // dejar pasar para que la página muestre el mensaje y haga signOut client-side.
+  if (pathname.startsWith('/login') || pathname.startsWith('/registro')) {
+    const sp = request.nextUrl.searchParams
+    const hasPostAuthParams = sp.has('verified') || sp.has('reset') || sp.has('error')
+    if (!hasPostAuthParams) {
+      return redirect(new URL(dashboardForRole(role), request.url))
     }
     return response
   }
 
   if (matchesAny(pathname, ['/super-admin-guardian'])) {
     if (role !== 'super_admin') {
-      const dest = dashboardForRole(role)
-      return NextResponse.redirect(new URL(dest, request.url))
+      return redirect(new URL(dashboardForRole(role), request.url))
     }
     return response
   }
 
   if (role === 'doctor' && matchesAny(pathname, CLINIC_ONLY_PREFIXES)) {
-    return NextResponse.redirect(new URL('/dashboard-medico', request.url))
+    return redirect(new URL('/dashboard-medico', request.url))
   }
 
   if (role === 'clinic_admin' && matchesAny(pathname, DOCTOR_ONLY_PREFIXES)) {
-    return NextResponse.redirect(new URL('/dashboard-clinica', request.url))
+    return redirect(new URL('/dashboard-clinica', request.url))
   }
 
   return response

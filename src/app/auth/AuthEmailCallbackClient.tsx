@@ -102,6 +102,13 @@ export default function AuthEmailCallbackClient() {
         // 1. token_hash en query → OTP sin PKCE (funciona en cualquier dispositivo)
         // ─────────────────────────────────────────────────────────────────
         if (token_hash && qTypeOtp) {
+          // Recovery: NO crear sesión aquí. Pasar el token a la página de reset
+          // para que verifyOtp ocurra solo en el instante del submit y la sesión
+          // exista por milisegundos. El usuario nunca está "logueado".
+          if (qTypeOtp === 'recovery') {
+            go(`/restablecer-contrasena?token_hash=${encodeURIComponent(token_hash)}&type=recovery`)
+            return
+          }
           setHint('Verificando correo…')
           const { data, error } = await client.auth.verifyOtp({ token_hash, type: qTypeOtp })
           if (cancelled) return
@@ -140,10 +147,27 @@ export default function AuthEmailCallbackClient() {
 
         // ─────────────────────────────────────────────────────────────────
         // 4. Hash tokens (implicit grant sin PKCE) — tokens en el fragmento #
-        //    Usamos setSession() directamente para evitar la race condition del
-        //    flowType check en _getSessionFromURL() del singleton.
+        //    Recovery con hash: el access_token ya es una sesión de recuperación;
+        //    redirigir directo a reset con el token para que no quede sesión activa.
+        //    Otros flujos: usamos setSession() directamente.
         // ─────────────────────────────────────────────────────────────────
         if (hashAccess && hashRefresh) {
+          if (hashType === 'recovery') {
+            // No crear sesión; llevar al usuario a reset sin estar logueado.
+            // El token_hash no está disponible en este formato, pero el
+            // access_token mismo puede usarse como sesión temporal en el submit.
+            // Fallback: usar el flujo de sesión completo con bloqueo de navegación.
+            setHint('Redirigiendo…')
+            const { data, error } = await client.auth.setSession({
+              access_token:  hashAccess,
+              refresh_token: hashRefresh,
+            })
+            if (cancelled) return
+            if (error || !data.session) { go(ERROR_URL); return }
+            // Sesión de recovery activa — proxy la bloquea a /restablecer-contrasena
+            go(RECOVERY_PATH)
+            return
+          }
           setHint('Iniciando sesión…')
           const { data, error } = await client.auth.setSession({
             access_token:  hashAccess,

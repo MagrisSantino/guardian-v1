@@ -115,7 +115,8 @@ function LoginForm({
           <button
             type="button"
             onClick={onForgotPassword}
-            className="text-xs font-medium text-blue-500 transition-colors hover:text-blue-700"
+            disabled={loading}
+            className="text-xs font-medium text-blue-500 transition-colors hover:text-blue-700 disabled:opacity-50 disabled:pointer-events-none"
           >
             ¿Olvidaste tu contraseña?
           </button>
@@ -209,11 +210,13 @@ function LoginPageInner() {
   const handleForgotPassword = async () => {
     const trimmedEmail = email.trim()
     if (!trimmedEmail) {
+      setLoginSuccess('')
       setLoginError('Ingresá tu correo en el campo de arriba para recuperar la contraseña.')
       return
     }
     setLoading(true)
     setLoginError('')
+    setLoginSuccess('')
     const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
       redirectTo: `${window.location.origin}/auth/callback`,
     })
@@ -255,8 +258,10 @@ function LoginPageInner() {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) { setCheckingSession(false); return }
+    // getUser() valida el JWT contra Supabase (a diferencia de getSession() que solo lee cookies).
+    // Esto evita que una sesión expirada/corrupta cause redirects en bucle.
+    supabase.auth.getUser().then(async ({ data: { user }, error }) => {
+      if (!user || error) { setCheckingSession(false); return }
 
       // Si el usuario llegó desde la confirmación de email o el reset de contraseña,
       // cerramos la sesión que Supabase creó automáticamente para que deba ingresar
@@ -270,16 +275,31 @@ function LoginPageInner() {
       }
 
       setCheckingSession(false)
-      await ensureProfileExists()
+
+      // Si devuelve 401, la sesión es válida en el cliente pero inválida en el servidor
+      // (token expirado/corrupto). Cerrar sesión para evitar el bucle /registro→/dashboard→/login.
+      try {
+        const res = await fetch('/api/auth/ensure-profile', { method: 'POST' })
+        if (res.status === 401) {
+          await supabase.auth.signOut()
+          return
+        }
+      } catch {
+        // ignorar errores de red; continuar con la consulta del perfil
+      }
+
       supabase
         .from('profiles')
         .select('role')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .maybeSingle()
-        .then(({ data: profile }) => {
+        .then(async ({ data: profile }) => {
           const redirected = redirectByRole(profile?.role ?? null)
           if (!redirected) {
-            setLoginError('Tu cuenta existe, pero tu perfil aún no está completo. Contactá soporte.')
+            // Perfil sin rol: sesión corrupta o incompleta. Cerrar sesión
+            // para que el usuario pueda registrarse o iniciar sesión de nuevo.
+            await supabase.auth.signOut()
+            window.location.href = '/login'
           }
         })
     })
@@ -288,6 +308,7 @@ function LoginPageInner() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginError('')
+    setLoginSuccess('')
     setLoading(true)
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 

@@ -1,10 +1,31 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { Eye, EyeOff, Lock, Loader2, Shield, CheckCircle2, XCircle } from 'lucide-react'
+import type { EmailOtpType } from '@supabase/supabase-js'
+import { ArrowLeft, Eye, EyeOff, Lock, Loader2, Shield, CheckCircle2, XCircle } from 'lucide-react'
+
+function GuardianHeader() {
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 md:px-10">
+      <Link href="/" className="flex items-center gap-2.5 group">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-600/25 transition-shadow group-hover:shadow-blue-600/40">
+          <Shield className="h-5 w-5 text-white" />
+        </div>
+        <span className="text-lg font-semibold text-slate-800 tracking-tight">Guardian</span>
+      </Link>
+      <Link
+        href="/login"
+        className="flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-blue-600"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Volver
+      </Link>
+    </header>
+  )
+}
 
 function validatePassword(pwd: string): string | null {
   if (pwd.length < 8)            return 'Mínimo 8 caracteres'
@@ -27,27 +48,27 @@ function Requirement({ met, label }: { met: boolean; label: string }) {
   )
 }
 
-export default function RestablecerContrasenaPage() {
+function RestablecerContrasenaInner() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [sessionReady, setSessionReady] = useState(false)
-  const router = useRouter()
 
-  // Verificar que hay una sesión activa (proveniente del callback de reset)
+  const tokenHash = searchParams?.get('token_hash') ?? null
+  const tokenType = (searchParams?.get('type') ?? 'recovery') as EmailOtpType
+
+  // Si no hay token en la URL el enlace es inválido o ya fue usado
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        // No hay sesión — el link expiró o ya se usó
-        router.replace('/login?error=invalid_link')
-      } else {
-        setSessionReady(true)
-      }
-    })
-  }, [router])
+    if (tokenHash === null) {
+      // Pequeño delay para evitar flash antes del redirect
+      const t = setTimeout(() => router.replace('/login?error=invalid_link'), 300)
+      return () => clearTimeout(t)
+    }
+  }, [tokenHash, router])
 
   const pwdError = password ? validatePassword(password) : null
   const reqs = {
@@ -62,30 +83,40 @@ export default function RestablecerContrasenaPage() {
     setError('')
 
     const validationError = validatePassword(password)
-    if (validationError) {
-      setError(validationError)
-      return
-    }
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden.')
+    if (validationError) { setError(validationError); return }
+    if (password !== confirmPassword) { setError('Las contraseñas no coinciden.'); return }
+    if (!tokenHash) { setError('El enlace no es válido. Pedí uno nuevo.'); return }
+
+    setLoading(true)
+
+    // Paso 1: verificar el token → crea una sesión temporal
+    const { error: otpError } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: tokenType,
+    })
+    if (otpError) {
+      setError('El enlace expiró o ya fue usado. Pedí uno nuevo desde "¿Olvidaste tu contraseña?".')
+      setLoading(false)
       return
     }
 
-    setLoading(true)
+    // Paso 2: actualizar la contraseña (requiere la sesión recién creada)
     const { error: updateError } = await supabase.auth.updateUser({ password })
-    setLoading(false)
+
+    // Paso 3: cerrar sesión inmediatamente — el usuario no debe quedar logueado
+    await supabase.auth.signOut()
 
     if (updateError) {
       setError('No se pudo actualizar la contraseña: ' + updateError.message)
+      setLoading(false)
       return
     }
 
-    // Cerrar sesión para que inicie con la nueva contraseña
-    await supabase.auth.signOut()
     router.replace('/login?reset=true')
   }
 
-  if (!sessionReady) {
+  // Mientras se verifica si hay token, mostrar spinner
+  if (tokenHash === null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -95,6 +126,7 @@ export default function RestablecerContrasenaPage() {
 
   return (
     <div className="relative min-h-screen bg-slate-50 overflow-hidden">
+      <GuardianHeader />
       {/* Background */}
       <div
         className="absolute inset-0 opacity-[0.35]"
@@ -163,7 +195,6 @@ export default function RestablecerContrasenaPage() {
                     </button>
                   </div>
 
-                  {/* Requisitos en tiempo real */}
                   {password && (
                     <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 pl-1">
                       <Requirement met={reqs.length}  label="8+ caracteres" />
@@ -227,5 +258,17 @@ export default function RestablecerContrasenaPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function RestablecerContrasenaPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    }>
+      <RestablecerContrasenaInner />
+    </Suspense>
   )
 }
