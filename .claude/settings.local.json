@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(node -e \"const c = require\\('./node_modules/next/dist/lib/constants.js'\\); console.log\\('PROXY_FILENAME:', c.PROXY_FILENAME\\); console.log\\('MIDDLEWARE_FILENAME:', c.MIDDLEWARE_FILENAME\\);\")",
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "Bash(dir \"C:\\\\Users\\\\Admin\\\\Desktop\\\\staff-salud\\\\public\")",
+      "Bash(node -e \"const { createCanvas } = require\\('canvas'\\); console.log\\('canvas ok'\\)\")",
+      "Bash(python3 -c \"from PIL import Image; print\\('pillow ok'\\)\")",
+      "Bash(python -c \"from PIL import Image; print\\('pillow ok'\\)\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx next:*)",
+      "Bash(cat next.config.js)",
+      "Bash(cat next.config.ts)",
+      "Bash(cat next.config.mjs)",
+      "Bash(rm -f package-lock.json)",
+      "Bash(npm install *)",
+      "Bash(npm view *)"
+    ]
+  }
+}

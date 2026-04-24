@@ -123,7 +123,24 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
   }
 
   async function handleDeleteShift() {
-    if (!confirm('¿Eliminar esta guardia definitivamente? Los postulantes no serán notificados.')) return
+    if (!confirm('¿Eliminar esta guardia definitivamente? Los postulantes serán notificados.')) return
+    const { data: pendingApps } = await supabase
+      .from('shift_applications')
+      .select('professional_id')
+      .eq('shift_id', shift.id)
+      .eq('status', 'pending')
+    if (pendingApps && pendingApps.length > 0) {
+      await supabase.from('notifications').insert(
+        pendingApps.map((a: { professional_id: string }) => ({
+          user_id: a.professional_id,
+          title: 'Guardia cancelada ⚠️',
+          message: `La clínica canceló la guardia: ${shift.title}. Tu postulación fue cerrada.`,
+        }))
+      )
+    }
+    await supabase.from('shift_applications').delete().eq('shift_id', shift.id)
+    await supabase.from('reviews').delete().eq('shift_id', shift.id)
+    await supabase.from('notifications').delete().eq('shift_id', shift.id)
     const { error } = await supabase.from('shifts').delete().eq('id', shift.id)
     if (error) {
       alert('Error al eliminar la guardia: ' + error.message)

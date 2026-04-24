@@ -32,6 +32,7 @@ export default function VerGuardiaAsignadaModal({ onClose, onRefresh, shift, onF
     setUnassigning(true)
     await supabase.from('shifts').update({ status: 'open', professional_id: null }).eq('id', shift.id)
     await supabase.from('shift_applications').update({ status: 'pending' }).eq('shift_id', shift.id).eq('professional_id', shift.professional_id)
+    await supabase.from('shift_applications').update({ status: 'pending' }).eq('shift_id', shift.id).eq('status', 'rejected')
     if (shift.professional_id) {
       await supabase.from('notifications').insert([{
         user_id: shift.professional_id,

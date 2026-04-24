@@ -107,7 +107,8 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
     await supabase.from('shifts').update({ status: 'open', professional_id: null }).eq('id', shift.id)
-    await supabase.from('shift_applications').update({ status: 'cancelled' }).eq('shift_id', shift.id).eq('professional_id', user.id)
+    await supabase.from('shift_applications').update({ status: 'cancelled' }).eq('shift_id', shift.id).eq('professional_id', user.id).eq('status', 'accepted')
+    await supabase.from('shift_applications').update({ status: 'pending' }).eq('shift_id', shift.id).eq('status', 'rejected')
     const clinicId = shift.clinic_id || shift.clinic?.id
     if (clinicId) {
       await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Baja de Profesional! ⚠️', message: `El médico se dio de baja de "${shift.title}". Vuelve a estar abierta.` }])

@@ -59,7 +59,8 @@ CREATE POLICY "shifts_insert" ON shifts
 -- (el API route /api/shifts/assign usa el anon key con la sesión del clinic_admin)
 CREATE POLICY "shifts_update" ON shifts
   FOR UPDATE TO authenticated
-  USING (clinic_id = auth.uid() OR professional_id = auth.uid() OR guardian_get_role() = 'super_admin');
+  USING (clinic_id = auth.uid() OR professional_id = auth.uid() OR guardian_get_role() = 'super_admin')
+  WITH CHECK (clinic_id = auth.uid() OR guardian_get_role() = 'super_admin');
 
 -- Solo la clínica dueña o super_admin puede eliminar
 CREATE POLICY "shifts_delete" ON shifts
@@ -94,6 +95,11 @@ CREATE POLICY "applications_insert" ON shift_applications
 CREATE POLICY "applications_update" ON shift_applications
   FOR UPDATE TO authenticated
   USING (
+    professional_id = auth.uid()
+    OR (SELECT clinic_id FROM shifts WHERE id = shift_id) = auth.uid()
+    OR guardian_get_role() = 'super_admin'
+  )
+  WITH CHECK (
     professional_id = auth.uid()
     OR (SELECT clinic_id FROM shifts WHERE id = shift_id) = auth.uid()
     OR guardian_get_role() = 'super_admin'
