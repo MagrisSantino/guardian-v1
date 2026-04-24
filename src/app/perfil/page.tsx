@@ -96,15 +96,16 @@ export default function Perfil() {
   }, [])
 
   async function fetchProfile() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       router.push('/login')
       return
     }
-    const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
+    const session = { user }
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     if (data) {
       setProfile(data)
-      const meta = session.user.user_metadata || {}
+      const meta = user.user_metadata || {}
       const birthFromProfile = (data as any).birth_date || ''
       const birthFromMeta = meta.birth_date || ''
 
@@ -116,7 +117,7 @@ export default function Perfil() {
       setBio(data.bio || meta.bio || '')
       setAvatarUrl(data.avatar_url || '')
       setCoverUrl(data.cover_url || '')
-      setKmFromCba((data as any).km_from_cba ?? null)
+      setKmFromCba((data as any).km_from_cba ?? (meta.km_from_cba != null ? Number(meta.km_from_cba) : null))
       setUniversity((data as any).university || meta.university || '')
 
       // Backfill: si el perfil no tiene birth_date pero el user_metadata sí,
@@ -272,6 +273,8 @@ export default function Perfil() {
   async function handleSave() {
     setSaving(true)
 
+    const normalizePhone = (raw: string) => raw.replace(/\D/g, '') || null
+
     const updateData = profile.role === 'doctor'
       ? {
           full_name: fullName,
@@ -279,7 +282,7 @@ export default function Perfil() {
           matricula,
           university: university || null,
           specialty: specialtiesList.length ? JSON.stringify(specialtiesList) : null,
-          whatsapp: whatsapp || null,
+          whatsapp: normalizePhone(whatsapp),
           bio: bio || null,
           experience_tags: experienceList.map((exp) => `${exp.place} | ${exp.time}`),
           avatar_url: avatarUrl,
@@ -290,7 +293,7 @@ export default function Perfil() {
           prestador_type: providerType === 'Otro' ? providerTypeOther : providerType,
           bio: institutionDescription || null,
           location_maps: address || null,
-          whatsapp: contactWhatsapp || null,
+          whatsapp: normalizePhone(contactWhatsapp),
           complexity: complexityTags,
           resources: resourceTags,
           services: serviceTags,

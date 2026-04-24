@@ -442,6 +442,7 @@ export default function RegistroPage() {
           cuit: roleForDb === 'clinic_admin' ? normalizedCuit : null,
           whatsapp: normalizedWhatsapp || null,
           location_maps: roleForDb === 'clinic_admin' ? address.trim() || null : null,
+          km_from_cba: roleForDb === 'clinic_admin' ? clinicKmFromCba : null,
           role: roleForDb,
           dni: roleForDb === 'doctor' ? dni.trim() || null : null,
           matricula: roleForDb === 'doctor' ? matricula.trim() || null : null,

@@ -40,9 +40,9 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
 
   useEffect(() => {
     async function checkVerification() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        const { data } = await supabase.from('profiles').select('is_verified').eq('id', session.user.id).single()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase.from('profiles').select('is_verified').eq('id', user.id).single()
         setIsVerified(data?.is_verified === true)
       }
       setCheckingAuth(false)
@@ -99,15 +99,15 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
       return
     }
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.')
       setLoading(false)
       return
     }
-    const clinicId = session.user.id
+    const clinicId = user.id
 
-    const dateTimeISO = `${date}T${timeStart}:00`
+    const dateTimeISO = new Date(`${date}T${timeStart}:00`).toISOString()
     const title = `${shiftCategory} de ${specialtyRequired}`
 
     const insertPayload: Record<string, unknown> = {

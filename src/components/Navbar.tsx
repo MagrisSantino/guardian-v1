@@ -35,16 +35,16 @@ export default function Navbar() {
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user || null)
-      if (session?.user) {
-        const { data } = await supabase.from('profiles').select('role, full_name, is_verified, avatar_url, whatsapp').eq('id', session.user.id).single()
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user || null)
+      if (user) {
+        const { data } = await supabase.from('profiles').select('role, full_name, is_verified, avatar_url, whatsapp').eq('id', user.id).single()
         setRole(data?.role ?? null)
         setProfileName(data?.full_name ?? null)
         setIsVerified(data?.is_verified ?? null)
         setAvatarUrl(data?.avatar_url ?? null)
         setProfileWhatsapp(data?.whatsapp ?? null)
-        fetchNotifications(session.user.id)
+        fetchNotifications(user.id)
       }
     }
     checkUser()
@@ -90,9 +90,9 @@ export default function Navbar() {
 
   async function handleMarkAsRead() {
     if (unreadCount === 0) return;
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return;
-    await supabase.from('notifications').update({ is_read: true }).eq('user_id', session.user.id).eq('is_read', false)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return;
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false)
     setNotifications(notifications.map(n => ({ ...n, is_read: true })))
   }
 

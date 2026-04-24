@@ -30,20 +30,20 @@ export default function MisGuardiasPage() {
   const router = useRouter()
 
   async function fetchMyGuardias() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       router.push('/login')
       return
     }
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'doctor') {
       router.push('/dashboard-medico')
       return
     }
     const { data } = await supabase
       .from('shifts')
-      .select('*, clinic:profiles!clinic_id(full_name)')
-      .eq('professional_id', session.user.id)
+      .select('*, clinic:profiles!clinic_id(full_name, whatsapp, phone, location_maps, complexity)')
+      .eq('professional_id', user.id)
       .in('status', ['filled', 'completed'])
       .order('date_time', { ascending: true })
       .limit(200)

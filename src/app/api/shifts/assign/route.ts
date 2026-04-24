@@ -245,9 +245,13 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      const notifHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+      const internalSecret = process.env.NOTIFICATIONS_INTERNAL_SECRET
+      if (internalSecret) notifHeaders['X-Internal-Secret'] = internalSecret
+
       const res = await fetch(`${request.nextUrl.origin}/api/notifications`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: notifHeaders,
         body: JSON.stringify({
           action: 'SHIFT_ASSIGNED',
           shift_id: shiftId,

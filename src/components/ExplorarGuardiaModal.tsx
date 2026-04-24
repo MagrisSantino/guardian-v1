@@ -85,9 +85,9 @@ export default function ExplorarGuardiaModal({
   useEffect(() => {
     // Auth: si ya tenemos caché no hacemos query
     if (cachedVerified !== null) return
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        supabase.from('profiles').select('is_verified').eq('id', session.user.id).single()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase.from('profiles').select('is_verified').eq('id', user.id).single()
           .then(({ data }) => {
             const v = data?.is_verified === true
             setIsVerified(v)
@@ -102,16 +102,16 @@ export default function ExplorarGuardiaModal({
     if (!shift?.id || !clinicId) return
     Promise.all([
       supabase.from('profiles').select('avatar_url, cover_url, num_doctors, num_nurses, resources, rating, reviews_count').eq('id', clinicId).single(),
-      supabase.auth.getSession()
-    ]).then(([profileRes, sessionRes]) => {
+      supabase.auth.getUser()
+    ]).then(([profileRes, userRes]) => {
       if (profileRes.data) {
         const r = profileRes.data
         setClinicProfile({ avatar_url: r.avatar_url, cover_url: r.cover_url, num_doctors: r.num_doctors, num_nurses: r.num_nurses, resources: parseArr(r.resources), rating: r.rating, reviews_count: r.reviews_count })
       }
       // Solo chequeamos postulación si el padre no nos pasó hasApplied ya
-      const session = sessionRes.data?.session
-      if (session?.user?.id && hasAppliedProp === undefined) {
-        supabase.from('shift_applications').select('id').eq('shift_id', shift.id).eq('professional_id', session.user.id).maybeSingle()
+      const user = userRes.data?.user
+      if (user?.id && hasAppliedProp === undefined) {
+        supabase.from('shift_applications').select('id').eq('shift_id', shift.id).eq('professional_id', user.id).maybeSingle()
           .then(({ data }) => setHasApplied(!!data))
       }
     })
@@ -121,8 +121,8 @@ export default function ExplorarGuardiaModal({
     if (!isVerified || hasOverlap || hasApplied) return
     if (onApply) { await onApply(shift.id); setHasApplied(true); onRefresh?.(); onClose(); return }
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: session?.user.id, status: 'pending' }])
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: user?.id, status: 'pending' }])
     if (clinicId) await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Nueva Postulación! 👨‍⚕️', message: `Un médico se postula a tu guardia: ${shift.title}.` }])
 
     // Notificación en segundo plano (sin bloquear la UI)
@@ -132,7 +132,7 @@ export default function ExplorarGuardiaModal({
       body: JSON.stringify({
         action: 'NEW_APPLICATION',
         shift_id: shift.id,
-        professional_id: session?.user.id,
+        professional_id: user?.id,
         clinic_id: clinicId || null,
       }),
     }).catch(() => {})
@@ -297,6 +297,9 @@ export default function ExplorarGuardiaModal({
                   <div className="flex flex-wrap gap-1">
                     {clinicProfile.resources.map((r, i) => <span key={i} className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">{r}</span>)}
                   </div>
+                )}
+                {shift?.clinic?.complexity && (
+                  <span className="inline-block rounded-full border border-purple-100 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700">{shift.clinic.complexity}</span>
                 )}
               </div>
             )}

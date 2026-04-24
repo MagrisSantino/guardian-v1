@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import {
   sendBajaDeMedicoEmail,
   sendGuardiaAsignadaEmail,
@@ -59,20 +61,20 @@ function maskEmail(email: string): string {
   return `${prefix}@${domain}`
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error(
-    'Faltan variables de entorno: NEXT_PUBLIC_SUPABASE_URL y/o SUPABASE_SERVICE_ROLE_KEY'
-  )
+function createSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error('Faltan variables de entorno: NEXT_PUBLIC_SUPABASE_URL y/o SUPABASE_SERVICE_ROLE_KEY')
+  }
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 }
 
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+type SupabaseAdminClient = ReturnType<typeof createSupabaseAdmin>
 
-async function getEmailByUserId(userId: string): Promise<string | null> {
+async function getEmailByUserId(admin: SupabaseAdminClient, userId: string): Promise<string | null> {
   try {
-    const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId)
+    const { data, error } = await admin.auth.admin.getUserById(userId)
     if (error) {
       console.error(`Error obteniendo email de userId=${userId}: ${error.message}`)
       return null
@@ -85,8 +87,8 @@ async function getEmailByUserId(userId: string): Promise<string | null> {
   }
 }
 
-async function getShiftOrThrow(shiftId: string): Promise<ShiftRow> {
-  const { data, error } = await supabaseAdmin
+async function getShiftOrThrow(admin: SupabaseAdminClient, shiftId: string): Promise<ShiftRow> {
+  const { data, error } = await admin
     .from('shifts')
     .select('id,title,shift_category,specialty_required,date_time,duration_hours,price,clinic_id,professional_id')
     .eq('id', shiftId)
@@ -98,8 +100,8 @@ async function getShiftOrThrow(shiftId: string): Promise<ShiftRow> {
   return data as unknown as ShiftRow
 }
 
-async function getProfileOrThrow(profileId: string): Promise<ProfilesRow> {
-  const { data, error } = await supabaseAdmin
+async function getProfileOrThrow(admin: SupabaseAdminClient, profileId: string): Promise<ProfilesRow> {
+  const { data, error } = await admin
     .from('profiles')
     .select('id,role,full_name,admin_name,is_verified')
     .eq('id', profileId)
@@ -111,8 +113,8 @@ async function getProfileOrThrow(profileId: string): Promise<ProfilesRow> {
   return data as unknown as ProfilesRow
 }
 
-async function getVerifiedDoctors(): Promise<ProfilesRow[]> {
-  const { data, error } = await supabaseAdmin
+async function getVerifiedDoctors(admin: SupabaseAdminClient): Promise<ProfilesRow[]> {
+  const { data, error } = await admin
     .from('profiles')
     .select('id,role,full_name,admin_name,is_verified,specialty')
     .eq('role', 'doctor')
@@ -147,6 +149,34 @@ function doctorMatchesSpecialty(doctor: ProfilesRow, shiftSpecialty: string | nu
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth: accept internal secret header OR a valid authenticated session
+    const internalSecret = process.env.NOTIFICATIONS_INTERNAL_SECRET
+    const providedSecret = request.headers.get('X-Internal-Secret')
+    const isInternalCall = internalSecret && providedSecret === internalSecret
+
+    if (!isInternalCall) {
+      const cookieStore = await cookies()
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (!supabaseUrl || !supabaseAnonKey) {
+        return NextResponse.json({ ok: false, error: 'Configuración del servidor incompleta' }, { status: 500 })
+      }
+      const supabaseAuth = createServerClient(supabaseUrl, supabaseAnonKey, {
+        cookies: {
+          getAll() { return cookieStore.getAll() },
+          setAll(list) {
+            try { list.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch {}
+          },
+        },
+      })
+      const { data: { user } } = await supabaseAuth.auth.getUser()
+      if (!user) {
+        return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
+      }
+    }
+
+    const supabaseAdmin = createSupabaseAdmin()
+
     const body = getActionBodyGuard(await request.json())
     if (!body) {
       return NextResponse.json({ ok: false, error: 'Body inválido' }, { status: 400 })
@@ -156,7 +186,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Falta shift_id' }, { status: 400 })
     }
 
-    const shift = await getShiftOrThrow(body.shift_id)
+    const shift = await getShiftOrThrow(supabaseAdmin, body.shift_id)
 
     const shiftTitle = shift.title || 'Guardia'
 
@@ -177,17 +207,17 @@ export async function POST(request: NextRequest) {
     const tasks: Array<Promise<unknown>> = []
 
     if (body.action === 'NEW_SHIFT') {
-      const clinicProfile = await getProfileOrThrow(shift.clinic_id)
+      const clinicProfile = await getProfileOrThrow(supabaseAdmin, shift.clinic_id)
       const clinicName = clinicProfile.full_name || null
 
-      const allDoctors = await getVerifiedDoctors()
+      const allDoctors = await getVerifiedDoctors(supabaseAdmin)
       const doctors = allDoctors.filter(doc => doctorMatchesSpecialty(doc, shift.specialty_required))
       console.log(
         `[notifications] NEW_SHIFT: ${doctors.length}/${allDoctors.length} médico(s) coinciden con especialidad "${shift.specialty_required ?? 'general'}" → enviando correos`,
       )
       for (const doc of doctors) {
         tasks.push((async () => {
-          const email = await getEmailByUserId(doc.id)
+          const email = await getEmailByUserId(supabaseAdmin, doc.id)
           if (!email) {
             console.log(
               `[notifications] NEW_SHIFT omitido: sin email en Auth | médico_id=${doc.id} nombre=${doc.full_name ?? '—'}`,
@@ -223,13 +253,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Falta professional_id en la guardia' }, { status: 400 })
       }
 
-      const doctorProfile = await getProfileOrThrow(shift.professional_id)
-      const clinicProfile = await getProfileOrThrow(shift.clinic_id)
+      const doctorProfile = await getProfileOrThrow(supabaseAdmin, shift.professional_id)
+      const clinicProfile = await getProfileOrThrow(supabaseAdmin, shift.clinic_id)
 
       const clinicName = clinicProfile.full_name || null
 
       tasks.push((async () => {
-        const email = await getEmailByUserId(doctorProfile.id)
+        const email = await getEmailByUserId(supabaseAdmin, doctorProfile.id)
         if (!email) {
           console.log(
             `[notifications] SHIFT_ASSIGNED omitido: médico sin email en Auth | id=${doctorProfile.id}`,
@@ -258,7 +288,7 @@ export async function POST(request: NextRequest) {
       let doctorProfile: ProfilesRow | null = null
 
       if (professionalId) {
-        doctorProfile = await getProfileOrThrow(professionalId)
+        doctorProfile = await getProfileOrThrow(supabaseAdmin, professionalId)
       } else {
         const { data, error } = await supabaseAdmin
           .from('shift_applications')
@@ -271,17 +301,17 @@ export async function POST(request: NextRequest) {
 
         if (error) throw new Error(`Error consultando aplicación: ${error.message}`)
         const pid = data?.professional_id as string | undefined
-        if (pid) doctorProfile = await getProfileOrThrow(pid)
+        if (pid) doctorProfile = await getProfileOrThrow(supabaseAdmin, pid)
       }
 
       if (!doctorProfile) {
         return NextResponse.json({ ok: false, error: 'No se pudo determinar professional_id' }, { status: 400 })
       }
 
-      const clinicProfile = await getProfileOrThrow(shift.clinic_id)
+      const clinicProfile = await getProfileOrThrow(supabaseAdmin, shift.clinic_id)
 
       tasks.push((async () => {
-        const email = await getEmailByUserId(clinicProfile.id)
+        const email = await getEmailByUserId(supabaseAdmin, clinicProfile.id)
         if (!email) {
           console.log(
             `[notifications] NEW_APPLICATION omitido: clínica sin email en Auth | clinic_id=${clinicProfile.id}`,
@@ -306,10 +336,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.action === 'DOCTOR_CANCELLED') {
-      const clinicProfile = await getProfileOrThrow(shift.clinic_id)
+      const clinicProfile = await getProfileOrThrow(supabaseAdmin, shift.clinic_id)
 
       tasks.push((async () => {
-        const email = await getEmailByUserId(clinicProfile.id)
+        const email = await getEmailByUserId(supabaseAdmin, clinicProfile.id)
         if (!email) {
           console.log(
             `[notifications] DOCTOR_CANCELLED omitido: clínica sin email en Auth | clinic_id=${clinicProfile.id}`,

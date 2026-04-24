@@ -25,8 +25,8 @@ export default function CalificarMedicoModal({ onClose, onRefresh, shift }: any)
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       setLoading(false)
       return
     }
@@ -34,7 +34,7 @@ export default function CalificarMedicoModal({ onClose, onRefresh, shift }: any)
     // 1. Insertar la reseña
     const { error: reviewError } = await supabase.from('reviews').insert([{
       shift_id: shift.id,
-      reviewer_id: session.user.id,
+      reviewer_id: user.id,
       reviewed_id: shift.professional_id,
       rating,
       comment,

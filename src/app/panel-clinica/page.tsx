@@ -125,13 +125,13 @@ function PanelClinicaContent() {
   }, [])
 
   async function fetchShifts() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
     setLoading(true)
     const { data } = await supabase
       .from('shifts')
       .select('*, applicants:shift_applications(status)')
-      .eq('clinic_id', session.user.id)
+      .eq('clinic_id', user.id)
       .order('date_time', { ascending: true })
     setShifts(data || [])
     setLoading(false)

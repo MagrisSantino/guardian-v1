@@ -402,38 +402,38 @@ function CalendarioMedicoContent() {
   }, [shiftIdParam])
 
   async function fetchData() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    setUserId(session.user.id)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    setUserId(user.id)
 
     const { data: profile } = await supabase
       .from('profiles')
       .select('blocked_dates')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single()
 
     const { data: openShifts } = await supabase
       .from('shifts')
-      .select('*, clinic:profiles!clinic_id(full_name)')
+      .select('*, clinic:profiles!clinic_id(full_name, whatsapp, phone, location_maps, complexity)')
       .eq('status', 'open')
       .order('date_time', { ascending: true })
       .limit(50)
     const { data: myShifts } = await supabase
       .from('shifts')
-      .select('*, clinic:profiles!clinic_id(full_name)')
-      .eq('professional_id', session.user.id)
+      .select('*, clinic:profiles!clinic_id(full_name, whatsapp, phone, location_maps, complexity)')
+      .eq('professional_id', user.id)
       .order('date_time', { ascending: true })
       .limit(200)
     const { data: appsData } = await supabase
       .from('shift_applications')
       .select('shift_id')
-      .eq('professional_id', session.user.id)
+      .eq('professional_id', user.id)
       .eq('status', 'pending')
       .order('id', { ascending: false })
     const { data: confirmedData } = await supabase
       .from('shifts')
       .select('id, date_time, duration_hours')
-      .eq('professional_id', session.user.id)
+      .eq('professional_id', user.id)
       .eq('status', 'filled')
       .order('date_time', { ascending: true })
 
@@ -463,7 +463,7 @@ function CalendarioMedicoContent() {
       fetchData().then(() => {
         supabase
           .from('shifts')
-          .select('*, clinic:profiles!clinic_id(full_name)')
+          .select('*, clinic:profiles!clinic_id(full_name, whatsapp, phone, location_maps, complexity)')
           .eq('id', shiftIdParam)
           .single()
           .then(({ data: shift }) => {
@@ -531,9 +531,9 @@ function CalendarioMedicoContent() {
   }
 
   const saveBlockedDates = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    await supabase.from('profiles').update({ blocked_dates: selectedBlockedDates }).eq('id', session.user.id)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('profiles').update({ blocked_dates: selectedBlockedDates }).eq('id', user.id)
     setBlockedDates(selectedBlockedDates)
     setIsSelectingDays(false)
   }

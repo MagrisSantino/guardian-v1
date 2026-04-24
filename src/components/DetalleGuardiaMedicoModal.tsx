@@ -23,6 +23,7 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     num_doctors?: number | null; num_nurses?: number | null
     resources?: string[]; rating?: number | null; reviews_count?: number | null
     avatar_url?: string | null; cover_url?: string | null
+    location_maps?: string | null; complexity?: string | null
   } | null>(null)
 
   useEffect(() => {
@@ -35,11 +36,11 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
         if (typeof v === 'string' && v.trim()) { try { const p = JSON.parse(v); return Array.isArray(p) ? p : [v] } catch { return [v] } }
         return []
       }
-      supabase.from('profiles').select('num_doctors, num_nurses, resources, rating, reviews_count, avatar_url, cover_url')
+      supabase.from('profiles').select('num_doctors, num_nurses, resources, rating, reviews_count, avatar_url, cover_url, location_maps, complexity')
         .eq('id', clinicId).single()
         .then(({ data }) => {
           if (!data) return
-          setClinicExtras({ num_doctors: data.num_doctors, num_nurses: data.num_nurses, resources: parseArr(data.resources), rating: data.rating, reviews_count: data.reviews_count, avatar_url: data.avatar_url, cover_url: data.cover_url })
+          setClinicExtras({ num_doctors: data.num_doctors, num_nurses: data.num_nurses, resources: parseArr(data.resources), rating: data.rating, reviews_count: data.reviews_count, avatar_url: data.avatar_url, cover_url: data.cover_url, location_maps: data.location_maps, complexity: data.complexity })
         })
     }
   }, [])
@@ -56,20 +57,20 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
   }, [userStatus, shift?.clinic_id, shift?.clinic])
 
   async function checkSecurity() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       setIsCheckingSecurity(false)
       return
     }
-    const { data } = await supabase.from('profiles').select('is_verified').eq('id', session.user.id).single()
+    const { data } = await supabase.from('profiles').select('is_verified').eq('id', user.id).single()
     setIsVerified(data?.is_verified || false)
     setIsCheckingSecurity(false)
   }
 
   async function checkExistingReview() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    const { data } = await supabase.from('reviews').select('id').eq('shift_id', shift.id).eq('reviewer_id', session.user.id).single()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase.from('reviews').select('id').eq('shift_id', shift.id).eq('reviewer_id', user.id).single()
     if (data) setHasRated(true)
   }
 
@@ -77,9 +78,9 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     if (!isVerified) { alert('Tu perfil no ha sido verificado por Guardian.'); return }
     if (hasOverlap) return
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
-    await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: session.user.id, status: 'pending' }])
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
+    await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: user.id, status: 'pending' }])
     const clinicId = shift.clinic_id || shift.clinic?.id
     if (clinicId) {
       await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Nueva Postulación! 👨‍⚕️', message: `Un médico se postula a tu guardia: ${shift.title}.` }])
@@ -90,9 +91,9 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
   async function handleWithdraw() {
     if (!confirm('¿Querés retirar tu postulación?')) return
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
-    await supabase.from('shift_applications').delete().eq('shift_id', shift.id).eq('professional_id', session.user.id)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
+    await supabase.from('shift_applications').update({ status: 'cancelled' }).eq('shift_id', shift.id).eq('professional_id', user.id).eq('status', 'pending')
     alert('Postulación retirada.'); onRefresh(); onClose()
   }
 
@@ -103,10 +104,10 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
       : `¿Dar de baja tu asistencia en ${shift.clinic?.full_name}?`
     if (!confirm(msg)) return
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
     await supabase.from('shifts').update({ status: 'open', professional_id: null }).eq('id', shift.id)
-    await supabase.from('shift_applications').delete().eq('shift_id', shift.id).eq('professional_id', session.user.id)
+    await supabase.from('shift_applications').update({ status: 'cancelled' }).eq('shift_id', shift.id).eq('professional_id', user.id)
     const clinicId = shift.clinic_id || shift.clinic?.id
     if (clinicId) {
       await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Baja de Profesional! ⚠️', message: `El médico se dio de baja de "${shift.title}". Vuelve a estar abierta.` }])
@@ -119,7 +120,7 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
       body: JSON.stringify({
         action: 'DOCTOR_CANCELLED',
         shift_id: shift.id,
-        professional_id: session?.user.id,
+        professional_id: user.id,
         clinic_id: clinicId || null,
       }),
     }).catch(() => {})
@@ -130,14 +131,14 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
   async function handleRateClinic(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { setLoading(false); return }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
 
     const clinicId = shift.clinic_id || shift.clinic?.id
 
     const { error } = await supabase.from('reviews').insert([{
       shift_id: shift.id,
-      reviewer_id: session.user.id,
+      reviewer_id: user.id,
       reviewed_id: clinicId,
       rating,
       comment,
@@ -174,7 +175,7 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     onClose()
   }
 
-  const location = shift.clinic?.location_maps || shift.clinic?.address || 'Ubicación no especificada'
+  const location = shift.clinic?.location_maps || clinicExtras?.location_maps || shift.clinic?.address || 'Ubicación no especificada'
   const shiftDate = new Date(shift.date_time)
   const coverUrl = getPublicImageUrl(clinicExtras?.cover_url)
   const avatarUrl = getPublicImageUrl(clinicExtras?.avatar_url)
@@ -324,6 +325,9 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
                   <div className="flex flex-wrap gap-1">
                     {clinicExtras.resources.map((r, i) => <span key={i} className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">{r}</span>)}
                   </div>
+                )}
+                {(clinicExtras.complexity || shift.clinic?.complexity) && (
+                  <span className="inline-block rounded-full border border-purple-100 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700">{clinicExtras.complexity || shift.clinic?.complexity}</span>
                 )}
               </div>
             )}

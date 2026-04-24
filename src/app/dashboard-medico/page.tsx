@@ -105,8 +105,9 @@ export default function DashboardMedico() {
 
   const fetchShiftsAndApplications = async () => {
     setIsFetching(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return;
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return;
+    const session = { user }
 
     const [shiftsRes, appsRes, confirmedRes, profileRes] = await Promise.all([
       supabase
@@ -171,9 +172,9 @@ export default function DashboardMedico() {
 
   const handleApply = async (shiftId: string) => {
     setLoadingBtn(shiftId)
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    const { error } = await supabase.from('shift_applications').insert([{ shift_id: shiftId, professional_id: session?.user.id, status: 'pending' }])
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { error } = await supabase.from('shift_applications').insert([{ shift_id: shiftId, professional_id: user?.id, status: 'pending' }])
     
     if (error) {
       alert('Error al postularse: ' + error.message)
@@ -198,7 +199,7 @@ export default function DashboardMedico() {
       body: JSON.stringify({
         action: 'NEW_APPLICATION',
         shift_id: shiftId,
-        professional_id: session?.user.id,
+        professional_id: user?.id,
         clinic_id: shift?.clinic_id || null,
       }),
     }).catch(() => {})
@@ -216,10 +217,15 @@ export default function DashboardMedico() {
   const handleCancelApplication = async (shiftId: string) => {
     if (!confirm('¿Querés retirar tu postulación para esta guardia?')) return;
     setLoadingBtn(shiftId)
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    const { error } = await supabase.from('shift_applications').delete().eq('shift_id', shiftId).eq('professional_id', session?.user.id)
-    
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { error } = await supabase
+      .from('shift_applications')
+      .update({ status: 'cancelled' })
+      .eq('shift_id', shiftId)
+      .eq('professional_id', user?.id)
+      .eq('status', 'pending')
+
     if (error) {
       alert('Error al cancelar: ' + error.message)
       setLoadingBtn(null)
