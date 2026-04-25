@@ -138,6 +138,14 @@ export default function DashboardMedico() {
     if (shiftsRes.data) {
       setShifts(shiftsRes.data)
       sessionStorage.setItem('medico_feed_cache', JSON.stringify(shiftsRes.data))
+      // Sync calendar cache: keep user's personal (non-open) shifts, replace open shifts with fresh data
+      try {
+        const existing: any[] = JSON.parse(sessionStorage.getItem('medico_calendar_cache') || '[]')
+        const personal = existing.filter((s: any) => s.status !== 'open')
+        const merged = [...shiftsRes.data, ...personal]
+        const unique = Array.from(new Map(merged.map((s: any) => [s.id, s])).values())
+        sessionStorage.setItem('medico_calendar_cache', JSON.stringify(unique))
+      } catch {}
     }
     if (appsRes.data) {
       const apps = appsRes.data.map((a: any) => a.shift_id)
