@@ -75,19 +75,23 @@ export async function POST() {
         .single()
 
       const needsRolePatch = !existingProfile.role
-      const needsMetaPatch = !fullProfile?.location_maps && meta.location_maps
+      const needsWhatsappPatch = !fullProfile?.whatsapp && meta.whatsapp
+      const needsLocationPatch = !fullProfile?.location_maps && meta.location_maps
+      const needsMetaPatch = needsWhatsappPatch || needsLocationPatch
 
       if (needsRolePatch || needsMetaPatch) {
         const updatePayload: Record<string, unknown> = {}
         if (needsRolePatch) { updatePayload.role = role; updatePayload.full_name = fullName }
         if (needsMetaPatch) {
-          updatePayload.location_maps = meta.location_maps ?? null
-          updatePayload.whatsapp = fullProfile?.whatsapp ?? meta.whatsapp ?? null
-          updatePayload.km_from_cba = meta.km_from_cba ?? null
-          updatePayload.cuit = meta.cuit ?? null
-          updatePayload.dni = meta.dni ?? null
-          updatePayload.matricula = meta.matricula ?? null
-          updatePayload.birth_date = meta.birth_date ?? null
+          if (needsWhatsappPatch) updatePayload.whatsapp = meta.whatsapp
+          if (needsLocationPatch) {
+            updatePayload.location_maps = meta.location_maps ?? null
+            updatePayload.km_from_cba = meta.km_from_cba ?? null
+            updatePayload.cuit = meta.cuit ?? null
+            updatePayload.dni = meta.dni ?? null
+            updatePayload.matricula = meta.matricula ?? null
+            updatePayload.birth_date = meta.birth_date ?? null
+          }
         }
         let { error: updateErr } = await supabaseAuth
           .from('profiles')

@@ -130,7 +130,7 @@ function PanelClinicaContent() {
     setLoading(true)
     const { data } = await supabase
       .from('shifts')
-      .select('*, applicants:shift_applications(status)')
+      .select('*, applicants:shift_applications(status), professional:profiles!professional_id(full_name, whatsapp, phone, is_verified)')
       .eq('clinic_id', user.id)
       .order('date_time', { ascending: true })
     setShifts(data || [])
@@ -142,7 +142,7 @@ function PanelClinicaContent() {
       fetchShifts().then(() => {
         supabase
           .from('shifts')
-          .select('*, applicants:shift_applications(status)')
+          .select('*, applicants:shift_applications(status), professional:profiles!professional_id(full_name, whatsapp, phone, is_verified)')
           .eq('id', shiftIdParam)
           .single()
           .then(({ data: shift }) => {

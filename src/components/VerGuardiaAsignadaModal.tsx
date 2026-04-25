@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale'
 import { MessageCircle, Calendar, Clock } from 'lucide-react'
 
 export default function VerGuardiaAsignadaModal({ onClose, onRefresh, shift, onFinalize }: { onClose: () => void; onRefresh: () => void; shift: any; onFinalize: () => void }) {
-  const [professional, setProfessional] = useState<any>(null)
+  const [professional, setProfessional] = useState<any>(shift?.professional ?? null)
   const [unassigning, setUnassigning] = useState(false)
 
   const shiftDate = shift?.date_time ? parseISO(shift.date_time) : null
@@ -16,14 +16,19 @@ export default function VerGuardiaAsignadaModal({ onClose, onRefresh, shift, onF
   const canFinalize = shiftDayStart != null && !isBefore(todayStart, shiftDayStart)
 
   useEffect(() => {
+    // Use joined data if available; only fetch separately as fallback
+    if (shift?.professional?.full_name) {
+      setProfessional(shift.professional)
+      return
+    }
     if (!shift?.professional_id) return
     supabase
       .from('profiles')
       .select('full_name, whatsapp, phone, is_verified')
       .eq('id', shift.professional_id)
       .single()
-      .then(({ data }) => setProfessional(data))
-  }, [shift?.professional_id])
+      .then(({ data }) => { if (data) setProfessional(data) })
+  }, [shift?.professional_id, shift?.professional])
 
   const waNumber = (professional?.whatsapp || professional?.phone)?.replace(/\D/g, '')
 
@@ -69,7 +74,7 @@ export default function VerGuardiaAsignadaModal({ onClose, onRefresh, shift, onF
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Profesional asignado</p>
           <div className="flex items-center justify-between gap-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
             <div>
-              <p className="font-bold text-slate-900">{professional?.full_name || 'Cargando...'}</p>
+              <p className="font-bold text-slate-900">{professional?.full_name || '—'}</p>
               {professional?.is_verified && (
                 <span className="text-xs text-emerald-700 font-medium">Verificado</span>
               )}
