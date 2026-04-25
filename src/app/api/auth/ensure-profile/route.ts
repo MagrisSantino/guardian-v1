@@ -68,10 +68,27 @@ export async function POST() {
       ).trim() || 'Usuario'
 
     if (existingProfile) {
-      // Profile exists but role may be null (e.g. created by a DB trigger without metadata).
-      // Patch it so the user can log in normally.
-      if (!existingProfile.role) {
-        const updatePayload: Record<string, unknown> = { role, full_name: fullName }
+      const { data: fullProfile } = await supabaseAuth
+        .from('profiles')
+        .select('role, location_maps, whatsapp')
+        .eq('id', user.id)
+        .single()
+
+      const needsRolePatch = !existingProfile.role
+      const needsMetaPatch = !fullProfile?.location_maps && meta.location_maps
+
+      if (needsRolePatch || needsMetaPatch) {
+        const updatePayload: Record<string, unknown> = {}
+        if (needsRolePatch) { updatePayload.role = role; updatePayload.full_name = fullName }
+        if (needsMetaPatch) {
+          updatePayload.location_maps = meta.location_maps ?? null
+          updatePayload.whatsapp = fullProfile?.whatsapp ?? meta.whatsapp ?? null
+          updatePayload.km_from_cba = meta.km_from_cba ?? null
+          updatePayload.cuit = meta.cuit ?? null
+          updatePayload.dni = meta.dni ?? null
+          updatePayload.matricula = meta.matricula ?? null
+          updatePayload.birth_date = meta.birth_date ?? null
+        }
         let { error: updateErr } = await supabaseAuth
           .from('profiles')
           .update(updatePayload)
@@ -82,24 +99,27 @@ export async function POST() {
             const admin = createSupabaseAdmin()
             const adminUpdate = await admin.from('profiles').update(updatePayload).eq('id', user.id)
             updateErr = adminUpdate.error ?? null
-          } catch (fallbackErr) {
-            const msg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
-            console.error('[ensure-profile] fallback admin update failed:', msg)
-          }
+          } catch {}
         }
         if (updateErr) {
-          console.error('[ensure-profile] update failed:', updateErr.message)
           return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 })
         }
-        return NextResponse.json({ ok: true, created: false, role })
       }
-      return NextResponse.json({ ok: true, created: false, role: existingProfile.role })
+      return NextResponse.json({ ok: true, created: false, role: existingProfile.role || role })
     }
 
     const insertPayload: Record<string, unknown> = {
       id: user.id,
       role,
       full_name: fullName,
+      email: user.email ?? null,
+      whatsapp: meta.whatsapp ?? null,
+      location_maps: meta.location_maps ?? null,
+      km_from_cba: meta.km_from_cba ?? null,
+      cuit: meta.cuit ?? null,
+      dni: meta.dni ?? null,
+      matricula: meta.matricula ?? null,
+      birth_date: meta.birth_date ?? null,
     }
 
     let { error: insertErr } = await supabaseAuth.from('profiles').insert(insertPayload)
