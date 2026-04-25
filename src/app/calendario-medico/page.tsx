@@ -414,13 +414,13 @@ function CalendarioMedicoContent() {
 
     const { data: openShifts } = await supabase
       .from('shifts')
-      .select('*, clinic:profiles!clinic_id(full_name, whatsapp, phone, location_maps, complexity)')
+      .select('*, clinic:profiles!clinic_id(*)')
       .eq('status', 'open')
       .order('date_time', { ascending: true })
       .limit(50)
     const { data: myShifts } = await supabase
       .from('shifts')
-      .select('*, clinic:profiles!clinic_id(full_name, whatsapp, phone, location_maps, complexity)')
+      .select('*, clinic:profiles!clinic_id(*)')
       .eq('professional_id', user.id)
       .order('date_time', { ascending: true })
       .limit(200)
@@ -463,7 +463,7 @@ function CalendarioMedicoContent() {
       fetchData().then(() => {
         supabase
           .from('shifts')
-          .select('*, clinic:profiles!clinic_id(full_name, whatsapp, phone, location_maps, complexity)')
+          .select('*, clinic:profiles!clinic_id(*)')
           .eq('id', shiftIdParam)
           .single()
           .then(({ data: shift }) => {

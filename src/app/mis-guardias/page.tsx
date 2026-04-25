@@ -42,7 +42,7 @@ export default function MisGuardiasPage() {
     }
     const { data } = await supabase
       .from('shifts')
-      .select('*, clinic:profiles!clinic_id(full_name, whatsapp, phone, location_maps, complexity)')
+      .select('*, clinic:profiles!clinic_id(*)')
       .eq('professional_id', user.id)
       .in('status', ['filled', 'completed'])
       .order('date_time', { ascending: true })
