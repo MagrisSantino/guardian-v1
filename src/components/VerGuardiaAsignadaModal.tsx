@@ -35,16 +35,22 @@ export default function VerGuardiaAsignadaModal({ onClose, onRefresh, shift, onF
   async function handleUnassign() {
     if (!confirm('¿Desasignar a este médico? La guardia volverá a estar abierta para que otro profesional se postule.')) return
     setUnassigning(true)
-    await supabase.from('shifts').update({ status: 'open', professional_id: null }).eq('id', shift.id)
-    await supabase.from('shift_applications').update({ status: 'pending' }).eq('shift_id', shift.id).eq('professional_id', shift.professional_id)
-    await supabase.from('shift_applications').update({ status: 'pending' }).eq('shift_id', shift.id).eq('status', 'rejected')
-    if (shift.professional_id) {
-      await supabase.from('notifications').insert([{
-        user_id: shift.professional_id,
-        shift_id: shift.id,
-        title: 'Guardia desasignada',
-        message: `La institución dio de baja tu asignación para la guardia: ${shift.title}. Podés postularte de nuevo si lo deseás.`
-      }])
+    try {
+      const res = await fetch('/api/shifts/cancel-assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_id: shift.id, actor: 'clinic' }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || 'Error al desasignar. Intentá de nuevo.')
+        setUnassigning(false)
+        return
+      }
+    } catch {
+      alert('Error de conexión. Intentá de nuevo.')
+      setUnassigning(false)
+      return
     }
     setUnassigning(false)
     onRefresh()

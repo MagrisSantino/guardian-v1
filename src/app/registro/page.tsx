@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { useLoadScript, Autocomplete } from '@react-google-maps/api'
+import { Autocomplete } from '@react-google-maps/api'
+import { useGoogleMapsLoaded } from '@/components/GoogleMapsProvider'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -283,10 +284,7 @@ export default function RegistroPage() {
   const [checkingSession, setCheckingSession] = useState(true)
   const router = useRouter()
 
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['places'],
-  })
+  const isLoaded = useGoogleMapsLoaded()
   const addressAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
   const [clinicKmFromCba, setClinicKmFromCba] = useState<number | null>(null)
 

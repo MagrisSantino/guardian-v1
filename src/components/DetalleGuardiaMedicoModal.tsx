@@ -78,12 +78,16 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     if (!isVerified) { alert('Tu perfil no ha sido verificado por Guardian.'); return }
     if (hasOverlap) return
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
-    await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: user.id, status: 'pending' }])
-    const clinicId = shift.clinic_id || shift.clinic?.id
-    if (clinicId) {
-      await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Nueva Postulación! 👨‍⚕️', message: `Un médico se postula a tu guardia: ${shift.title}.` }])
+    try {
+      const res = await fetch('/api/shifts/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_id: shift.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(data.error || 'Error al postularse. Intentá de nuevo.'); setLoading(false); return }
+    } catch {
+      alert('Error de conexión. Intentá de nuevo.'); setLoading(false); return
     }
     alert('¡Postulación enviada!'); onRefresh(); onClose()
   }
@@ -104,29 +108,26 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
       : `¿Dar de baja tu asistencia en ${shift.clinic?.full_name}?`
     if (!confirm(msg)) return
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
-    await supabase.from('shifts').update({ status: 'open', professional_id: null }).eq('id', shift.id)
-    await supabase.from('shift_applications').update({ status: 'cancelled' }).eq('shift_id', shift.id).eq('professional_id', user.id).eq('status', 'accepted')
-    await supabase.from('shift_applications').update({ status: 'pending' }).eq('shift_id', shift.id).eq('status', 'rejected')
-    const clinicId = shift.clinic_id || shift.clinic?.id
-    if (clinicId) {
-      await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Baja de Profesional! ⚠️', message: `El médico se dio de baja de "${shift.title}". Vuelve a estar abierta.` }])
+    try {
+      const res = await fetch('/api/shifts/cancel-assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_id: shift.id, actor: 'doctor' }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || 'Error al cancelar. Intentá de nuevo.')
+        setLoading(false)
+        return
+      }
+    } catch {
+      alert('Error de conexión. Intentá de nuevo.')
+      setLoading(false)
+      return
     }
-
-    // Notificación en segundo plano (sin bloquear la UI)
-    void fetch('/api/notifications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'DOCTOR_CANCELLED',
-        shift_id: shift.id,
-        professional_id: user.id,
-        clinic_id: clinicId || null,
-      }),
-    }).catch(() => {})
-
-    alert('Guardia cancelada.'); onRefresh(); onClose()
+    alert('Guardia cancelada.')
+    onRefresh()
+    onClose()
   }
 
   async function handleRateClinic(e: React.FormEvent) {
@@ -150,25 +151,7 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
       setLoading(false)
       return
     }
-
-    // Recalcular rating de la clínica en profiles
-    if (clinicId) {
-      const { data: allReviews } = await supabase
-        .from('reviews')
-        .select('rating')
-        .eq('reviewed_id', clinicId)
-
-      if (allReviews && allReviews.length > 0) {
-        const avg = allReviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / allReviews.length
-        await supabase
-          .from('profiles')
-          .update({
-            rating: Math.round(avg * 100) / 100,
-            reviews_count: allReviews.length,
-          })
-          .eq('id', clinicId)
-      }
-    }
+    // El trigger guardian_update_rating recalcula rating y reviews_count atómicamente.
 
     setLoading(false)
     alert('¡Gracias por calificar!')

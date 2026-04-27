@@ -4,7 +4,8 @@ import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { AlertCircle, Activity, CalendarDays, Ambulance, MapPin, Clock, DollarSign, Briefcase, X } from 'lucide-react'
-import { GoogleMap, Marker, useLoadScript } from '@react-google-maps/api'
+import { GoogleMap, Marker } from '@react-google-maps/api'
+import { useGoogleMapsLoaded } from '@/components/GoogleMapsProvider'
 import { isGeneralSpecialty, specialtiesMatch } from '@/lib/specialties'
 
 const CBA_CAPITAL = { lat: -31.4201, lng: -64.1888 }
@@ -121,26 +122,21 @@ export default function ExplorarGuardiaModal({
     if (!isVerified || hasOverlap || hasApplied) return
     if (onApply) { await onApply(shift.id); setHasApplied(true); onRefresh?.(); onClose(); return }
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('shift_applications').insert([{ shift_id: shift.id, professional_id: user?.id, status: 'pending' }])
-    if (clinicId) await supabase.from('notifications').insert([{ user_id: clinicId, shift_id: shift.id, title: '¡Nueva Postulación! 👨‍⚕️', message: `Un médico se postula a tu guardia: ${shift.title}.` }])
-
-    // Notificación en segundo plano (sin bloquear la UI)
-    void fetch('/api/notifications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'NEW_APPLICATION',
-        shift_id: shift.id,
-        professional_id: user?.id,
-        clinic_id: clinicId || null,
-      }),
-    }).catch(() => {})
-
+    try {
+      const res = await fetch('/api/shifts/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_id: shift.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(data.error || 'Error al postularse. Intentá de nuevo.'); setLoading(false); return }
+    } catch {
+      alert('Error de conexión. Intentá de nuevo.'); setLoading(false); return
+    }
     setHasApplied(true); alert('¡Postulación enviada!'); onRefresh?.(); onClose()
   }
 
-  const { isLoaded: mapsLoaded } = useLoadScript({ googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '', libraries: ['places'] })
+  const mapsLoaded = useGoogleMapsLoaded()
 
   const coverUrl = getPublicImageUrl(clinicProfile?.cover_url)
   const avatarUrl = getPublicImageUrl(clinicProfile?.avatar_url)

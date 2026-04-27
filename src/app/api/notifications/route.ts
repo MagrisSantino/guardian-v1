@@ -16,6 +16,24 @@ type NotificationAction =
   | 'NEW_APPLICATION'
   | 'DOCTOR_CANCELLED'
 
+// Rate limiter en memoria (best-effort en single-instance; usar Redis en producción multi-instancia).
+const _rateLimitMap = new Map<string, number>()
+const RATE_LIMIT_MS = 30_000
+
+function isRateLimited(key: string): boolean {
+  const last = _rateLimitMap.get(key)
+  const now = Date.now()
+  if (last && now - last < RATE_LIMIT_MS) return true
+  _rateLimitMap.set(key, now)
+  if (_rateLimitMap.size > 10_000) {
+    // Limpiar entradas viejas para evitar memory leak en instancias long-lived
+    for (const [k, v] of _rateLimitMap) {
+      if (now - v > RATE_LIMIT_MS * 2) _rateLimitMap.delete(k)
+    }
+  }
+  return false
+}
+
 type ProfilesRow = {
   id: string
   role: string | null
@@ -180,6 +198,12 @@ export async function POST(request: NextRequest) {
     const body = getActionBodyGuard(await request.json())
     if (!body) {
       return NextResponse.json({ ok: false, error: 'Body inválido' }, { status: 400 })
+    }
+
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const rlKey = `${ip}:${body.action}:${body.shift_id ?? ''}`
+    if (isRateLimited(rlKey)) {
+      return NextResponse.json({ ok: false, error: 'Demasiadas solicitudes' }, { status: 429 })
     }
 
     if (!body.shift_id) {
@@ -390,8 +414,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, action: body.action, dispatched: tasks.length })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Error desconocido'
-    console.error('[notifications] ✗ error fatal:', message, err)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    console.error('[notifications] ✗ error fatal:', err)
+    return NextResponse.json({ ok: false, error: 'Error interno' }, { status: 500 })
   }
 }

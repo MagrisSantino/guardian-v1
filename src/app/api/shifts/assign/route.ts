@@ -2,8 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { createSupabaseAdmin } from '@/lib/supabaseAdmin'
-import { pendingShiftConflictsWithAssignedShift, type AssignedShiftBlock } from '@/lib/shiftOverlap'
-
 type Body = {
   shift_id?: string
   application_id?: string
@@ -119,93 +117,26 @@ export async function POST(request: NextRequest) {
       (r: { professional_id: string }) => r.professional_id,
     )
 
-    const { data: otherPendingApps } = await admin
-      .from('shift_applications')
-      .select('id, shift_id')
-      .eq('professional_id', professionalId)
-      .eq('status', 'pending')
-      .neq('shift_id', shiftId)
-      .order('id', { ascending: false })
+    // Llamada atómica: acepta la postulación, rechaza las demás y maneja solapamientos
+    // en una sola transacción DB (elimina la race condition de los 4 UPDATEs separados).
+    const { data: rpcResult, error: rpcErr } = await supabaseAuth.rpc('accept_shift_application', {
+      p_application_id: applicationId,
+      p_shift_id: shiftId,
+      p_professional_id: professionalId,
+    })
 
-    const otherShiftIds = [...new Set((otherPendingApps || []).map((r: { shift_id: string }) => r.shift_id))]
-
-    let shiftsById = new Map<string, { id: string; date_time: string; duration_hours: number | null }>()
-    if (otherShiftIds.length > 0) {
-      const { data: otherShifts, error: osErr } = await admin
-        .from('shifts')
-        .select('id, date_time, duration_hours')
-        .in('id', otherShiftIds)
-      if (osErr) {
-        console.error('[assign] shifts otras:', osErr.message)
-        return NextResponse.json({ ok: false, error: 'Error al validar otras postulaciones' }, { status: 500 })
-      }
-      for (const row of otherShifts || []) {
-        shiftsById.set(row.id, {
-          id: row.id,
-          date_time: row.date_time as string,
-          duration_hours: row.duration_hours,
-        })
-      }
+    if (rpcErr) {
+      console.error('[assign] rpc accept_shift_application:', rpcErr.message)
+      if (rpcErr.message.includes('SHIFT_NOT_OPEN'))
+        return NextResponse.json({ ok: false, error: 'La guardia ya no está abierta' }, { status: 409 })
+      if (rpcErr.message.includes('APPLICATION_NOT_PENDING'))
+        return NextResponse.json({ ok: false, error: 'La postulación ya no está pendiente' }, { status: 409 })
+      if (rpcErr.message.includes('NOT_AUTHORIZED'))
+        return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 403 })
+      return NextResponse.json({ ok: false, error: 'Error al asignar la guardia' }, { status: 500 })
     }
 
-    const assignedBlock: AssignedShiftBlock = {
-      id: shift.id,
-      date_time: shift.date_time as string,
-      duration_hours: shift.duration_hours,
-    }
-
-    const crossShiftRejectAppIds: string[] = []
-    for (const row of otherPendingApps || []) {
-      const sid = row.shift_id as string
-      const other = shiftsById.get(sid)
-      if (!other) continue
-      if (
-        pendingShiftConflictsWithAssignedShift(
-          other.date_time,
-          other.duration_hours,
-          assignedBlock,
-        )
-      ) {
-        crossShiftRejectAppIds.push(row.id as string)
-      }
-    }
-
-    const { error: upShiftErr } = await admin
-      .from('shifts')
-      .update({ status: 'filled', professional_id: professionalId })
-      .eq('id', shiftId)
-
-    if (upShiftErr) {
-      console.error('[assign] update shift:', upShiftErr.message)
-      return NextResponse.json({ ok: false, error: upShiftErr.message }, { status: 500 })
-    }
-
-    const { error: upAccErr } = await admin
-      .from('shift_applications')
-      .update({ status: 'accepted' })
-      .eq('id', applicationId)
-
-    if (upAccErr) {
-      console.error('[assign] accept app:', upAccErr.message)
-      return NextResponse.json({ ok: false, error: upAccErr.message }, { status: 500 })
-    }
-
-    await admin
-      .from('shift_applications')
-      .update({ status: 'rejected' })
-      .eq('shift_id', shiftId)
-      .eq('status', 'pending')
-
-    if (crossShiftRejectAppIds.length > 0) {
-      const { error: rejErr } = await admin
-        .from('shift_applications')
-        .update({ status: 'rejected' })
-        .in('id', crossShiftRejectAppIds)
-
-      if (rejErr) {
-        console.error('[assign] reject cross-shift:', rejErr.message)
-      }
-    }
+    const crossShiftRejectAppIds: string[] = (rpcResult as { rejected_cross_shift?: string[] } | null)?.rejected_cross_shift ?? []
 
     try {
       const notifWinner = {
@@ -228,17 +159,20 @@ export async function POST(request: NextRequest) {
       }
 
       if (crossShiftRejectAppIds.length > 0) {
-        const rejectSet = new Set(crossShiftRejectAppIds)
-        const appMeta = (otherPendingApps || []).filter((a) => rejectSet.has(a.id as string))
-        await admin.from('notifications').insert(
-          appMeta.map((a) => ({
-            user_id: professionalId,
-            shift_id: a.shift_id as string,
-            title: 'Postulación retirada',
-            message:
-              'Tu postulación se rechazó automáticamente: hay solapamiento con otra guardia que te asignaron.',
-          })),
-        )
+        const { data: crossApps } = await admin
+          .from('shift_applications')
+          .select('id, shift_id')
+          .in('id', crossShiftRejectAppIds)
+        if (crossApps && crossApps.length > 0) {
+          await admin.from('notifications').insert(
+            crossApps.map((a) => ({
+              user_id: professionalId,
+              shift_id: a.shift_id as string,
+              title: 'Postulación retirada',
+              message: 'Tu postulación se rechazó automáticamente: hay solapamiento con otra guardia que te asignaron.',
+            })),
+          )
+        }
       }
     } catch (notifErr) {
       console.error('[assign] notificaciones in-app (no aborta respuesta):', notifErr)
@@ -272,11 +206,7 @@ export async function POST(request: NextRequest) {
       rejected_cross_shift: crossShiftRejectAppIds.length,
     })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Error desconocido'
-    if (msg.includes('SUPABASE_SERVICE_ROLE_KEY')) {
-      return NextResponse.json({ ok: false, error: 'Configuración del servidor incompleta' }, { status: 500 })
-    }
     console.error('[assign]', e)
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
+    return NextResponse.json({ ok: false, error: 'Error interno' }, { status: 500 })
   }
 }

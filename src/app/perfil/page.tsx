@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useLoadScript, Autocomplete } from '@react-google-maps/api'
+import { Autocomplete } from '@react-google-maps/api'
+import { useGoogleMapsLoaded } from '@/components/GoogleMapsProvider'
 import { BadgeCheck, AlertCircle, LogOut, Save, User, Camera, Loader2, Trash } from 'lucide-react'
 import { MEDICAL_SPECIALTIES } from '@/lib/specialties'
 
@@ -47,10 +48,7 @@ export default function Perfil() {
   const RESOURCE_OPTIONS = ['Rx', 'Laboratorio', 'Cocina', 'Habitación/es'] as const
   const router = useRouter()
 
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['places'],
-  })
+  const isLoaded = useGoogleMapsLoaded()
   const addressAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
 
   const CBA_CAPITAL = { lat: -31.4201, lng: -64.1888 }
@@ -188,45 +186,46 @@ export default function Perfil() {
     setLoading(false)
   }
 
-  // Función para subir la foto a Supabase Storage con límite de tamaño
+  async function compressImage(file: File, maxDim = 900): Promise<File> {
+    return new Promise((resolve) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        let { width, height } = img
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round(height * maxDim / width); width = maxDim }
+          else { width = Math.round(width * maxDim / height); height = maxDim }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width; canvas.height = height
+        canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
+        URL.revokeObjectURL(url)
+        canvas.toBlob(
+          (blob) => resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file),
+          'image/jpeg', 0.82
+        )
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+      img.src = url
+    })
+  }
+
   async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
     try {
       setUploadingAvatar(true)
-      
-      if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('Debes seleccionar una imagen.')
-      }
-      
-      const file = event.target.files[0]
+      if (!event.target.files || event.target.files.length === 0) throw new Error('Debes seleccionar una imagen.')
+      const raw = event.target.files[0]
+      if (!raw.type.startsWith('image/')) throw new Error('Formato inválido. Solo se permiten imágenes.')
 
-      // --- VALIDACIONES DE SEGURIDAD ---
-      // 1. Validar tamaño (Límite: 2MB)
-      const maxSizeInBytes = 2 * 1024 * 1024; // 2 Megabytes
-      if (file.size > maxSizeInBytes) {
-        throw new Error('La imagen es demasiado pesada. El tamaño máximo permitido es 2MB.')
-      }
-
-      // 2. Validar que sea estrictamente una imagen
-      if (!file.type.startsWith('image/')) {
-        throw new Error('Formato inválido. Por favor, sube solo archivos de imagen (JPG, PNG, etc).')
-      }
-      // ---------------------------------
-
-      const fileExt = file.name.split('.').pop()
-      const filePath = `${profile.id}-${Math.random()}.${fileExt}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file)
-
+      const file = await compressImage(raw)
+      const filePath = `${profile.id}-${Math.random()}.jpg`
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file)
       if (uploadError) throw uploadError
-
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
       setAvatarUrl(data.publicUrl)
     } catch (error: any) {
       alert('Error: ' + error.message)
     } finally {
-      // Limpiamos el input para que el usuario pueda volver a intentar si se equivocó
       event.target.value = ''
       setUploadingAvatar(false)
     }
@@ -235,31 +234,14 @@ export default function Perfil() {
   async function uploadCover(event: React.ChangeEvent<HTMLInputElement>) {
     try {
       setUploadingCover(true)
+      if (!event.target.files || event.target.files.length === 0) throw new Error('Debes seleccionar una imagen.')
+      const raw = event.target.files[0]
+      if (!raw.type.startsWith('image/')) throw new Error('Formato inválido. Solo se permiten imágenes.')
 
-      if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('Debes seleccionar una imagen.')
-      }
-
-      const file = event.target.files[0]
-
-      const maxSizeInBytes = 2 * 1024 * 1024 // 2MB
-      if (file.size > maxSizeInBytes) {
-        throw new Error('La imagen es demasiado pesada. El tamaño máximo permitido es 2MB.')
-      }
-
-      if (!file.type.startsWith('image/')) {
-        throw new Error('Formato inválido. Por favor, sube solo archivos de imagen (JPG, PNG, etc).')
-      }
-
-      const fileExt = file.name.split('.').pop()
-      const filePath = `cover-${profile.id}-${Math.random()}.${fileExt}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file)
-
+      const file = await compressImage(raw, 1200)
+      const filePath = `cover-${profile.id}-${Math.random()}.jpg`
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file)
       if (uploadError) throw uploadError
-
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
       setCoverUrl(data.publicUrl)
     } catch (error: any) {

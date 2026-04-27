@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import AppNavbarWrapper from "@/components/AppNavbarWrapper";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import { GoogleMapsProvider } from "@/components/GoogleMapsProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -51,8 +52,10 @@ export default function RootLayout({
     <html lang="es" className="scroll-smooth">
       <body className={`${inter.variable} font-sans antialiased bg-background text-foreground selection:bg-primary/20`}>
         <ServiceWorkerRegister />
-        <AppNavbarWrapper />
-        {children}
+        <GoogleMapsProvider>
+          <AppNavbarWrapper />
+          {children}
+        </GoogleMapsProvider>
       </body>
     </html>
   );

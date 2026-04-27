@@ -14,7 +14,7 @@ import {
   Activity,
   ClipboardList,
 } from 'lucide-react'
-import { useLoadScript } from '@react-google-maps/api'
+import { useGoogleMapsLoaded } from '@/components/GoogleMapsProvider'
 import { Briefcase } from 'lucide-react'
 
 type ViewMode = 'grid' | 'list'
@@ -76,10 +76,7 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
         : 'border-rose-100 bg-rose-50 text-rose-700'
 
   const incompatible = !!hasOverlap
-  const { isLoaded: mapsLoaded } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['places'],
-  })
+  const mapsLoaded = useGoogleMapsLoaded()
   const geoKey = `geo_${location}`
   const [distanceKm, setDistanceKm] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {

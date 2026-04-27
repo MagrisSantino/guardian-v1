@@ -13,12 +13,16 @@ const PRECACHE_ASSETS = [
   '/manifest.json',
 ]
 
+// ── Mensaje desde el cliente (ej: SKIP_WAITING para activar nueva versión)
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
+})
+
 // ── Instalación ────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then(cache => cache.addAll(PRECACHE_ASSETS))
-      .then(() => self.skipWaiting())
   )
 })
 

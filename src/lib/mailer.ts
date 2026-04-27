@@ -24,8 +24,8 @@ function formatDateTimeEs(dateTime: string | null | undefined): string {
   return formatter.format(d)
 }
 
-const GUARDIAN_BRAND_PRIMARY = '#2563eb' // blue-600
-const GUARDIAN_BRAND_SECONDARY = '#3b82f6' // blue-500
+const GUARDIAN_BRAND_PRIMARY = '#2563eb'
+const GUARDIAN_BRAND_SECONDARY = '#3b82f6'
 
 function renderBaseTemplate(params: {
   title: string
@@ -108,43 +108,35 @@ function renderBaseTemplate(params: {
   </html>`
 }
 
-let transporterCache: Transporter | null = null
+// ── Transport: Resend (preferred) or nodemailer fallback ──────────────────
 
-function getTransporter(): Transporter {
-  if (transporterCache) return transporterCache
+let nodemailerCache: Transporter | null = null
 
-  const user = process.env.EMAIL_USER
-  const pass = process.env.EMAIL_PASS
+async function sendHtmlEmail(params: { to: string; subject: string; html: string }) {
+  const resendKey = process.env.RESEND_API_KEY
 
-  if (!user || !pass) {
-    throw new Error('Faltan variables de entorno EMAIL_USER y/o EMAIL_PASS en el servidor.')
+  if (resendKey) {
+    const { Resend } = await import('resend')
+    const resend = new Resend(resendKey)
+    const from = process.env.RESEND_FROM ?? 'Guardian <noreply@resend.dev>'
+    const { error } = await resend.emails.send({ from, to: params.to, subject: params.subject, html: params.html })
+    if (error) throw new Error(`Resend error: ${error.message}`)
+    return
   }
 
-  transporterCache = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user, pass },
-  })
-
-  return transporterCache
-}
-
-async function sendHtmlEmail(params: {
-  to: string
-  subject: string
-  html: string
-}) {
+  // Nodemailer fallback
   const user = process.env.EMAIL_USER
-  if (!user) throw new Error('Falta EMAIL_USER en el servidor.')
+  const pass = process.env.EMAIL_PASS
+  if (!user || !pass) throw new Error('Faltan variables de entorno EMAIL_USER y/o EMAIL_PASS (o RESEND_API_KEY).')
 
-  const transporter = getTransporter()
+  if (!nodemailerCache) {
+    nodemailerCache = nodemailer.createTransport({ service: 'gmail', auth: { user, pass } })
+  }
 
-  await transporter.sendMail({
-    from: `"Guardian" <${user}>`,
-    to: params.to,
-    subject: params.subject,
-    html: params.html,
-  })
+  await nodemailerCache.sendMail({ from: `"Guardian" <${user}>`, to: params.to, subject: params.subject, html: params.html })
 }
+
+// ── Public send functions ─────────────────────────────────────────────────
 
 export type NuevaGuardiaPublicadaEmailParams = {
   toEmail: string
@@ -171,12 +163,7 @@ export async function sendNuevaGuardiaPublicadaEmail(params: NuevaGuardiaPublica
       { label: 'Precio', value: params.price != null ? `$${params.price}` : '—' },
     ],
   })
-
-  await sendHtmlEmail({
-    to: params.toEmail,
-    subject: 'Guardian | Nueva Guardia Publicada',
-    html,
-  })
+  await sendHtmlEmail({ to: params.toEmail, subject: 'Guardian | Nueva Guardia Publicada', html })
 }
 
 export type GuardiaAsignadaEmailParams = {
@@ -198,12 +185,7 @@ export async function sendGuardiaAsignadaEmail(params: GuardiaAsignadaEmailParam
       { label: 'Fecha y horario', value: formatDateTimeEs(params.dateTime) },
     ],
   })
-
-  await sendHtmlEmail({
-    to: params.toEmail,
-    subject: 'Guardian | Guardia Asignada',
-    html,
-  })
+  await sendHtmlEmail({ to: params.toEmail, subject: 'Guardian | Guardia Asignada', html })
 }
 
 export type NuevaPostulacionEmailParams = {
@@ -225,12 +207,7 @@ export async function sendNuevaPostulacionEmail(params: NuevaPostulacionEmailPar
       { label: 'Fecha y horario', value: formatDateTimeEs(params.dateTime) },
     ],
   })
-
-  await sendHtmlEmail({
-    to: params.toEmail,
-    subject: 'Guardian | Nueva Postulación',
-    html,
-  })
+  await sendHtmlEmail({ to: params.toEmail, subject: 'Guardian | Nueva Postulación', html })
 }
 
 export type BajaDeMedicoEmailParams = {
@@ -251,11 +228,5 @@ export async function sendBajaDeMedicoEmail(params: BajaDeMedicoEmailParams) {
       { label: 'Fecha y horario', value: formatDateTimeEs(params.dateTime) },
     ],
   })
-
-  await sendHtmlEmail({
-    to: params.toEmail,
-    subject: 'Guardian | Baja de Médico',
-    html,
-  })
+  await sendHtmlEmail({ to: params.toEmail, subject: 'Guardian | Baja de Médico', html })
 }
-

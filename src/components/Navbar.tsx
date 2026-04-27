@@ -255,6 +255,7 @@ export default function Navbar() {
                 <div className="relative" ref={dropdownRef}>
                   <button
                     type="button"
+                    aria-label="Notificaciones"
                     onClick={toggleNotifications}
                     className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
                   >

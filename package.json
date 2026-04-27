@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:types": "npx supabase gen types typescript --project-id cztrvwzftzkoykcryzdl --schema public > src/lib/database.types.ts"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",
@@ -20,7 +21,8 @@
     "next": "15.5.15",
     "nodemailer": "^8.0.3",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "resend": "^6.12.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

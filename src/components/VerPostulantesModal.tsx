@@ -74,7 +74,7 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
     setLoading(true)
     const { data } = await supabase
       .from('shift_applications')
-      .select('*, professional:profiles!professional_id(*)')
+      .select('*, professional:profiles!professional_id(id,full_name,birth_date,avatar_url,cover_url,specialty,bio,rating,reviews_count,is_verified,university,experience_tags,whatsapp,phone,matricula,medical_license,dni)')
       .eq('shift_id', shift.id)
       .in('status', ['pending', 'accepted'])
       .order('id', { ascending: false })
@@ -123,28 +123,18 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
   }
 
   async function handleDeleteShift() {
-    if (!confirm('¿Eliminar esta guardia definitivamente? Los postulantes serán notificados.')) return
-    const { data: pendingApps } = await supabase
-      .from('shift_applications')
-      .select('professional_id')
-      .eq('shift_id', shift.id)
-      .eq('status', 'pending')
-    if (pendingApps && pendingApps.length > 0) {
-      await supabase.from('notifications').insert(
-        pendingApps.map((a: { professional_id: string }) => ({
-          user_id: a.professional_id,
-          title: 'Guardia cancelada ⚠️',
-          message: `La clínica canceló la guardia: ${shift.title}. Tu postulación fue cerrada.`,
-        }))
-      )
-    }
-    await supabase.from('shift_applications').delete().eq('shift_id', shift.id)
-    await supabase.from('reviews').delete().eq('shift_id', shift.id)
-    await supabase.from('notifications').delete().eq('shift_id', shift.id)
-    const { error } = await supabase.from('shifts').delete().eq('id', shift.id)
-    if (error) {
-      alert('Error al eliminar la guardia: ' + error.message)
-      return
+    if (!confirm('¿Cancelar esta guardia? Los postulantes serán notificados automáticamente.')) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/shifts/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_id: shift.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(data.error || 'Error al cancelar la guardia.'); setLoading(false); return }
+    } catch {
+      alert('Error de conexión. Intentá de nuevo.'); setLoading(false); return
     }
     onRefresh()
     onClose()
@@ -226,10 +216,12 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
                 </div>
               )}
 
-              {/* Contacto y legales: DNI, WhatsApp, Matrícula General */}
-              {((selectedApp.professional?.dni != null && String(selectedApp.professional.dni).trim() !== '') ||
-                (selectedApp.professional?.whatsapp || selectedApp.professional?.phone) ||
-                ((selectedApp.professional?.matricula != null && String(selectedApp.professional.matricula).trim() !== '') || (selectedApp.professional?.medical_license != null && String(selectedApp.professional.medical_license).trim() !== ''))) && (
+              {/* Contacto y legales: DNI, Matrícula (siempre), WhatsApp (solo post-asignación) */}
+              {(selectedApp.professional?.dni != null && String(selectedApp.professional.dni).trim() !== '') ||
+               (selectedApp.professional?.matricula != null && String(selectedApp.professional.matricula).trim() !== '') ||
+               (selectedApp.professional?.medical_license != null && String(selectedApp.professional.medical_license).trim() !== '') ||
+               (selectedApp.status === 'accepted' && (selectedApp.professional?.whatsapp || selectedApp.professional?.phone))
+                ? (
                 <div className="mt-5">
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Contacto y legales</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -239,7 +231,7 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
                         <p className="text-sm font-semibold text-slate-900">{selectedApp.professional.dni}</p>
                       </div>
                     )}
-                    {(selectedApp.professional?.whatsapp || selectedApp.professional?.phone) && (
+                    {selectedApp.status === 'accepted' && (selectedApp.professional?.whatsapp || selectedApp.professional?.phone) && (
                       <div className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">WhatsApp</p>
                         <p className="text-sm font-semibold text-slate-900">{selectedApp.professional.whatsapp || selectedApp.professional.phone || '—'}</p>
@@ -253,7 +245,7 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
                     )}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Matrículas de especialidad (JSON.parse de specialty) */}
               {(() => {

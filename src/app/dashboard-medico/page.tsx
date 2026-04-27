@@ -112,7 +112,7 @@ export default function DashboardMedico() {
     const [shiftsRes, appsRes, confirmedRes, profileRes] = await Promise.all([
       supabase
         .from('shifts')
-        .select('*, clinic:profiles!clinic_id(*)')
+        .select('*, clinic:profiles!clinic_id(id,full_name,avatar_url,cover_url,location_maps,rating,reviews_count,num_doctors,num_nurses,resources,complexity)')
         .eq('status', 'open')
         .order('date_time', { ascending: true })
         .limit(50),
@@ -180,45 +180,30 @@ export default function DashboardMedico() {
 
   const handleApply = async (shiftId: string) => {
     setLoadingBtn(shiftId)
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const { error } = await supabase.from('shift_applications').insert([{ shift_id: shiftId, professional_id: user?.id, status: 'pending' }])
-    
-    if (error) {
-      alert('Error al postularse: ' + error.message)
+    try {
+      const res = await fetch('/api/shifts/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_id: shiftId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        alert(data.error || 'Error al postularse. Intentá de nuevo.')
+        setLoadingBtn(null)
+        return
+      }
+    } catch {
+      alert('Error de conexión. Intentá de nuevo.')
       setLoadingBtn(null)
-      return;
+      return
     }
-
-    const shift = shifts.find(s => s.id === shiftId);
-    if (shift && shift.clinic_id) {
-      await supabase.from('notifications').insert([{
-        user_id: shift.clinic_id,
-        shift_id: shiftId,
-        title: '¡Nueva Postulación! 👨‍⚕️',
-        message: `Un profesional se acaba de postular a tu guardia: ${shift.title}.`
-      }])
-    }
-
-    // Notificación en segundo plano (sin bloquear la UI)
-    void fetch('/api/notifications', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'NEW_APPLICATION',
-        shift_id: shiftId,
-        professional_id: user?.id,
-        clinic_id: shift?.clinic_id || null,
-      }),
-    }).catch(() => {})
 
     alert('¡Postulación enviada a la clínica con éxito!')
-    
-    // --- ACTUALIZAMOS ESTADO Y CACHÉ AL INSTANTE ---
+
     const newApps = [...myApplications, shiftId]
     setMyApplications(newApps)
     sessionStorage.setItem('medico_apps_cache', JSON.stringify(newApps))
-    
+
     setLoadingBtn(null)
   }
 

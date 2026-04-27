@@ -99,58 +99,35 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
       return
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.')
+    const dateTimeISO = new Date(`${date}T${timeStart}:00`).toISOString()
+
+    try {
+      const res = await fetch('/api/shifts/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shift_category: shiftCategory,
+          specialty_required: specialtyRequired,
+          date_time: dateTimeISO,
+          duration_hours: durationHours,
+          price: parsedPrice,
+          viaticos: viaticosExtra,
+          payment_timeframe: tiempoAPagar || null,
+          description: detallesAdicionales || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
       setLoading(false)
+      if (!res.ok) { alert(data.error || 'Error al publicar la guardia.'); return }
+    } catch {
+      setLoading(false)
+      alert('Error de conexión. Intentá de nuevo.')
       return
     }
-    const clinicId = user.id
 
-    const dateTimeISO = new Date(`${date}T${timeStart}:00`).toISOString()
-    const title = `${shiftCategory} de ${specialtyRequired}`
-
-    const insertPayload: Record<string, unknown> = {
-      clinic_id: clinicId,
-      title,
-      shift_category: shiftCategory,
-      specialty_required: specialtyRequired,
-      date_time: dateTimeISO,
-      duration_hours: durationHours,
-      price: parsedPrice,
-      viaticos: viaticosExtra,
-      payment_timeframe: tiempoAPagar || null,
-      description: detallesAdicionales || null,
-      status: 'open'
-    }
-
-    const { data: inserted, error } = await supabase
-      .from('shifts')
-      .insert([insertPayload])
-      .select('id')
-      .single()
-
-    setLoading(false)
-    if (error) {
-      alert('Error: ' + error.message)
-    } else {
-      const shiftId = inserted?.id
-      if (shiftId) {
-        // Notificación en segundo plano (sin bloquear la UI)
-        void fetch('/api/notifications', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'NEW_SHIFT',
-            shift_id: shiftId,
-            clinic_id: clinicId,
-          }),
-        }).catch(() => {})
-      }
-      alert('Guardia publicada exitosamente')
-      onRefresh()
-      onClose()
-    }
+    alert('Guardia publicada exitosamente')
+    onRefresh()
+    onClose()
   }
 
   if (checkingAuth) {
