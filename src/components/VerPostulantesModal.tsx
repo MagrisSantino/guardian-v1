@@ -258,7 +258,7 @@ export default function VerPostulantesModal({ onClose, onRefresh, shift }: any) 
                             <span className="text-xs font-bold text-slate-800">{review.rating}</span>
                           </div>
                         </div>
-                        <p className="text-xs text-slate-600 mb-2 leading-relaxed">"{review.comment || 'Sin comentario.'}"</p>
+                        <p className="text-xs text-slate-600 mb-2 leading-relaxed">&ldquo;{review.comment || 'Sin comentario.'}&rdquo;</p>
                         <p className="text-[9px] text-slate-400 font-medium uppercase tracking-wider">
                           {format(new Date(review.created_at), 'MMM yyyy', { locale: es })}
                         </p>

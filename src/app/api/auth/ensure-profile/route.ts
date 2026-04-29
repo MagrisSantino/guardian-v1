@@ -8,19 +8,33 @@ function mapRole(rawRole: unknown): 'doctor' | 'clinic' {
   return 'doctor'
 }
 
+function nullIfEmpty(v: unknown): string | null {
+  if (v == null) return null
+  const s = String(v).trim()
+  return s === '' ? null : s
+}
+
 export async function POST() {
   try {
     const supabase = await createSupabaseServer()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
-    if (!user) {
+    if (authErr || !user) {
+      console.error('[ensure-profile] auth error:', authErr?.message)
       return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
+    }
+
+    if (!user.email) {
+      return NextResponse.json(
+        { ok: false, error: 'Tu cuenta no tiene email asociado en auth.' },
+        { status: 400 },
+      )
     }
 
     const admin = createSupabaseAdmin()
     const meta = (user.user_metadata ?? {}) as Record<string, unknown>
     const role = mapRole(meta.role)
-    const emailPrefix = (user.email ?? '').split('@')[0]?.trim() || 'Usuario'
+    const emailPrefix = user.email.split('@')[0]?.trim() || 'Usuario'
     const fullName =
       String(meta.full_name ?? meta.institution_name ?? emailPrefix).trim() || 'Usuario'
 
@@ -31,54 +45,99 @@ export async function POST() {
       .maybeSingle()
 
     if (lookupErr) {
-      return NextResponse.json({ ok: false, error: lookupErr.message }, { status: 500 })
+      console.error('[ensure-profile] lookup error:', lookupErr)
+      return NextResponse.json(
+        { ok: false, error: 'Error consultando perfil', details: lookupErr.message },
+        { status: 500 },
+      )
     }
 
-    if (existing) {
+    if (existing?.role) {
+      // Cuenta ya existe — asegurar que también exista la fila de profile
+      // (si quedó a medias por un fallo previo, se crea una mínima ahora)
+      if (existing.role === 'doctor') {
+        await admin.from('doctor_profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true })
+      } else if (existing.role === 'clinic') {
+        await admin.from('clinic_profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true })
+      }
       return NextResponse.json({ ok: true, created: false, role: existing.role })
     }
 
+    // Insert accounts (paso crítico — si falla, abortamos)
     const { error: accountErr } = await admin.from('accounts').insert({
       id: user.id,
       role,
-      email: user.email ?? null,
+      email: user.email,
       full_name: fullName,
-      phone: (meta.phone as string) ?? null,
-      whatsapp: (meta.whatsapp as string) ?? null,
+      phone: nullIfEmpty(meta.phone),
+      whatsapp: nullIfEmpty(meta.whatsapp),
     })
 
     if (accountErr) {
-      return NextResponse.json({ ok: false, error: accountErr.message }, { status: 500 })
+      console.error('[ensure-profile] account insert error:', accountErr)
+      return NextResponse.json(
+        { ok: false, error: 'No se pudo crear la cuenta', details: accountErr.message },
+        { status: 500 },
+      )
     }
 
+    // Insert role-specific profile (best-effort: si falla con datos completos,
+    // hacemos un insert mínimo para que el usuario pueda loguearse y completar
+    // desde /perfil. No bloqueamos el login por un campo del metadata).
     if (role === 'doctor') {
-      const { error: doctorErr } = await admin.from('doctor_profiles').insert({
+      const fullPayload = {
         id: user.id,
-        dni: (meta.dni as string) ?? null,
-        matricula: (meta.matricula as string) ?? null,
-        cuit: (meta.cuit as string) ?? null,
-        birth_date: (meta.birth_date as string) ?? null,
-      })
-      if (doctorErr) {
-        return NextResponse.json({ ok: false, error: doctorErr.message }, { status: 500 })
+        dni: nullIfEmpty(meta.dni),
+        matricula: nullIfEmpty(meta.matricula),
+        cuit: nullIfEmpty(meta.cuit),
+        birth_date: nullIfEmpty(meta.birth_date),
+        university: nullIfEmpty(meta.university),
+        location_maps: nullIfEmpty(meta.location_maps),
+        km_from_cba:
+          meta.km_from_cba != null && !Number.isNaN(Number(meta.km_from_cba))
+            ? Number(meta.km_from_cba)
+            : null,
       }
-    }
-
-    if (role === 'clinic') {
-      const { error: clinicErr } = await admin.from('clinic_profiles').insert({
+      const { error: doctorErr } = await admin.from('doctor_profiles').insert(fullPayload)
+      if (doctorErr) {
+        console.error('[ensure-profile] doctor_profiles full insert failed, retrying minimal:', doctorErr)
+        const { error: minimalErr } = await admin.from('doctor_profiles').insert({ id: user.id })
+        if (minimalErr) {
+          console.error('[ensure-profile] doctor_profiles minimal insert error:', minimalErr)
+          return NextResponse.json(
+            { ok: false, error: 'No se pudo crear el perfil de médico', details: minimalErr.message },
+            { status: 500 },
+          )
+        }
+      }
+    } else if (role === 'clinic') {
+      const clinicAddress = nullIfEmpty(meta.location_maps) ?? nullIfEmpty(meta.address)
+      const fullPayload = {
         id: user.id,
-        cuit: (meta.cuit as string) ?? null,
-        admin_name: (meta.admin_name as string) ?? null,
-        provider_type: (meta.provider_type as string) ?? null,
-      })
+        cuit: nullIfEmpty(meta.cuit),
+        admin_name: nullIfEmpty(meta.admin_name),
+        provider_type: nullIfEmpty(meta.provider_type),
+        address: clinicAddress,
+        location_maps: clinicAddress,
+      }
+      const { error: clinicErr } = await admin.from('clinic_profiles').insert(fullPayload)
       if (clinicErr) {
-        return NextResponse.json({ ok: false, error: clinicErr.message }, { status: 500 })
+        console.error('[ensure-profile] clinic_profiles full insert failed, retrying minimal:', clinicErr)
+        const { error: minimalErr } = await admin.from('clinic_profiles').insert({ id: user.id })
+        if (minimalErr) {
+          console.error('[ensure-profile] clinic_profiles minimal insert error:', minimalErr)
+          return NextResponse.json(
+            { ok: false, error: 'No se pudo crear el perfil de clínica', details: minimalErr.message },
+            { status: 500 },
+          )
+        }
       }
     }
 
     return NextResponse.json({ ok: true, created: true, role })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    console.error('[ensure-profile] fatal:', msg)
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
 }

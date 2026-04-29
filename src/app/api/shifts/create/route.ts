@@ -34,18 +34,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Tu clínica aún no fue verificada' }, { status: 403 })
     }
 
+    const categoryLower = data.shift_category.toLowerCase()
+    const categoryLabel = categoryLower.charAt(0).toUpperCase() + categoryLower.slice(1)
+    const generatedTitle = data.title?.trim() || `${categoryLabel} de ${data.specialty_required}`
+
     const { data: inserted, error: insertErr } = await admin
       .from('shifts')
       .insert([{
         clinic_id: user.id,
-        title: `${data.shift_category} de ${data.specialty_required}`,
+        title: generatedTitle,
         specialty_required: data.specialty_required,
         starts_at: data.starts_at,
         ends_at: data.ends_at,
         price: data.price,
         payment_timeframe: data.payment_timeframe || null,
         viaticos: data.viaticos || null,
-        shift_category: data.shift_category.toLowerCase(),
+        shift_category: categoryLower,
         description: data.description || null,
         status: 'open',
       }])

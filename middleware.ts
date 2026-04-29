@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-type Role = 'doctor' | 'clinic_admin' | 'super_admin' | string | null
+type Role = 'doctor' | 'clinic' | 'admin' | string | null
 
 function isRecoveryToken(accessToken: string): boolean {
   try {
@@ -38,8 +38,8 @@ function matchesAny(pathname: string, prefixes: readonly string[]): boolean {
 
 function dashboardForRole(role: Role): string {
   if (role === 'doctor') return '/dashboard-medico'
-  if (role === 'clinic_admin') return '/dashboard-clinica'
-  if (role === 'super_admin') return '/super-admin-guardian'
+  if (role === 'clinic') return '/dashboard-clinica'
+  if (role === 'admin') return '/super-admin-guardian'
   return '/login'
 }
 
@@ -91,7 +91,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).maybeSingle()
+    .from('accounts').select('role').eq('id', user.id).maybeSingle()
 
   const role = (profile?.role as Role) ?? null
 
@@ -109,7 +109,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (matchesAny(pathname, ['/super-admin-guardian'])) {
-    if (role !== 'super_admin') return redirect(new URL(dashboardForRole(role), request.url))
+    if (role !== 'admin') return redirect(new URL(dashboardForRole(role), request.url))
     return response
   }
 
@@ -117,7 +117,7 @@ export async function middleware(request: NextRequest) {
     return redirect(new URL('/dashboard-medico', request.url))
   }
 
-  if (role === 'clinic_admin' && matchesAny(pathname, DOCTOR_ONLY_PREFIXES)) {
+  if (role === 'clinic' && matchesAny(pathname, DOCTOR_ONLY_PREFIXES)) {
     return redirect(new URL('/dashboard-clinica', request.url))
   }
 

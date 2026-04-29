@@ -335,7 +335,7 @@ function CalendarioMedicoContent() {
       .from('doctor_profiles')
       .select('blocked_dates')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
     const { data: openShifts } = await supabase
       .from('shifts')
@@ -393,9 +393,9 @@ function CalendarioMedicoContent() {
                 .from('shift_applications')
                 .select('id')
                 .eq('shift_id', shift.id)
-                .eq('assigned_doctor_id', userId)
+                .eq('doctor_id', userId)
                 .eq('status', 'pending')
-                .single()
+                .maybeSingle()
                 .then(({ data: app }) => {
                   let status = 'disponible'
                   if (shift.status === 'completed' && shift.assigned_doctor_id === userId) status = 'completada'
@@ -879,11 +879,11 @@ function CalendarioMedicoContent() {
                             {dayShifts.map((shift) => {
                               const status = getUserStatus(shift)
                               const statusConfig = STATUS_CONFIG[status]
-                              const category = shift.shift_category || 'Guardia'
+                              const category = String(shift.shift_category || 'guardia').toLowerCase()
                               const CategoryIcon =
-                                category === 'Guardia'
+                                category === 'guardia'
                                   ? Activity
-                                  : category === 'Consultorio'
+                                  : category === 'consultorio'
                                     ? ClipboardList
                                     : Ambulance
                               return (

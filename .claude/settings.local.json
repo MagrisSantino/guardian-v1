@@ -19,7 +19,31 @@
       "Bash(cat next.config.mjs)",
       "Bash(rm -f package-lock.json)",
       "Bash(npm install *)",
-      "Bash(npm view *)"
+      "Bash(npm view *)",
+      "Bash(xargs grep *)",
+      "Bash(cat)",
+      "Read(//tmp/**)",
+      "Bash(find src/components -name \"*.tsx\" -exec wc -l {} +)",
+      "Bash(find src *)",
+      "Bash(xargs wc *)",
+      "Bash(npm ls *)",
+      "Bash(grep -E \"\\(page|route\\)\\\\.tsx?$\")",
+      "Bash(find /c/Users/santi/OneDrive/Escritorio/Repositorios/guardian-v1/src/app -name \"page.tsx\" -exec head -3 {} +)",
+      "Bash(node -e ' *)",
+      "Bash(grep -v \"//.*sessionStorage\")",
+      "Bash(grep -v \"node_modules\\\\|\\\\.next\\\\|backup\\\\|//.*date_time\")",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(find /c/Users/santi/OneDrive/Escritorio/Repositorios/guardian-v1/src -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec grep -l \"sessionStorage\" {} \\\\;)",
+      "Bash(python3)",
+      "Bash(cat eslint.config.mjs)",
+      "Bash(cat .eslintrc*)",
+      "Bash(cat .eslintrc.js)",
+      "Bash(node -e \"const m = require\\('./node_modules/eslint-config-next/core-web-vitals.js'\\); console.log\\(typeof m, Array.isArray\\(m\\), m && typeof m[Symbol.iterator]\\)\")",
+      "Bash(node -e \"const m = require\\('./node_modules/eslint-config-next/core-web-vitals.js'\\); console.log\\(JSON.stringify\\(Object.keys\\(m\\)\\)\\)\")",
+      "Bash(grep -E \"\\\\.js$|\\\\.mjs$\")",
+      "Bash(ls node_modules/@eslint/)",
+      "Bash(node -e \"require\\('@eslint/eslintrc'\\); console.log\\('ok'\\)\")",
+      "Bash(npm test *)"
     ]
   }
 }

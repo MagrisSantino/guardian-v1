@@ -52,6 +52,13 @@ export async function POST(request: NextRequest) {
       if (insertErr.code === '23505' || insertErr.message.toLowerCase().includes('unique')) {
         return NextResponse.json({ ok: false, error: 'Ya tenés una postulación para esta guardia' }, { status: 409 })
       }
+      if (insertErr.message.includes('SHIFT_OVERLAP')) {
+        return NextResponse.json(
+          { ok: false, error: 'Ya tenés una guardia asignada que se superpone con este horario' },
+          { status: 409 },
+        )
+      }
+      console.error('[apply] insert:', insertErr.message)
       return NextResponse.json({ ok: false, error: 'Error al registrar la postulación' }, { status: 500 })
     }
 

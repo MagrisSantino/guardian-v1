@@ -56,12 +56,12 @@ export default function DashboardMedico() {
         .from('accounts')
         .select('verified_at')
         .eq('id', user.id)
-        .single(),
+        .maybeSingle(),
       supabase
         .from('doctor_profiles')
         .select('specialty, specialty_verified')
         .eq('id', user.id)
-        .single(),
+        .maybeSingle(),
     ])
 
     if (shiftsRes.data) setShifts(shiftsRes.data)

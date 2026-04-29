@@ -244,16 +244,35 @@ function LoginPageInner() {
     return false
   }
 
-  async function ensureProfileExists() {
+  async function ensureProfileExists(): Promise<string | null> {
     try {
       const res = await fetch('/api/auth/ensure-profile', { method: 'POST' })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        const msg = typeof body?.error === 'string' ? body.error : `HTTP ${res.status}`
-        console.error('[login] ensure-profile failed:', msg)
-      }
+      const body = await res.json().catch(() => ({}))
+      if (res.ok && typeof body?.role === 'string') return body.role
+      console.error('[login] ensure-profile failed:', {
+        status: res.status,
+        error: body?.error,
+        details: body?.details,
+      })
     } catch (err) {
-      console.error('[login] ensure-profile:', err)
+      console.error('[login] ensure-profile network error:', err)
+    }
+
+    // Fallback: si el endpoint falló, quizás la cuenta ya existe en DB.
+    // Consultamos directo para evitar bloquear al usuario por un fallo transitorio
+    // o por un fallo en la creación del profile (que se puede completar luego desde /perfil).
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return null
+      const { data } = await supabase
+        .from('accounts')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      return typeof data?.role === 'string' ? data.role : null
+    } catch (err) {
+      console.error('[login] fallback accounts query failed:', err)
+      return null
     }
   }
 
@@ -323,22 +342,11 @@ function LoginPageInner() {
       }
       setLoading(false)
     } else {
-      await ensureProfileExists()
-      const { data: profile } = await supabase
-        .from('accounts')
-        .select('role')
-        .eq('id', data.user.id)
-        .maybeSingle()
-
-      if (profile?.role === 'doctor') {
-        window.location.href = '/dashboard-medico'
-        return
-      }
-
-      const redirected = redirectByRole(profile?.role ?? null)
+      const role = await ensureProfileExists()
+      const redirected = redirectByRole(role)
       if (!redirected) {
         await supabase.auth.signOut()
-        setLoginError('No pudimos completar el acceso porque falta tu perfil. Volvé a registrarte o contactá soporte.')
+        setLoginError('No pudimos completar el acceso. Revisá tu conexión y volvé a intentar; si persiste, abrí la consola (F12) y avisanos qué error aparece en /api/auth/ensure-profile.')
         setLoading(false)
       }
     }

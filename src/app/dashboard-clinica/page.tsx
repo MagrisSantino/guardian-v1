@@ -687,8 +687,8 @@ function DashboardClinicaContent() {
                             {dayShifts.map((shift) => {
                               const status = getGuardiaStatus(shift)
                               const config = STATUS_CONFIG[status]
-                              const category = shift.shift_category || 'Guardia'
-                              const CategoryIcon = category === 'Guardia' ? Activity : category === 'Consultorio' ? ClipboardList : Ambulance
+                              const category = String(shift.shift_category || 'guardia').toLowerCase()
+                              const CategoryIcon = category === 'guardia' ? Activity : category === 'consultorio' ? ClipboardList : Ambulance
                               return (
                                 <span key={shift.id} className={config.textClass}>
                                   <CategoryIcon className="h-4 w-4" />
