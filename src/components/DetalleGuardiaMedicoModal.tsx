@@ -36,11 +36,11 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
         if (typeof v === 'string' && v.trim()) { try { const p = JSON.parse(v); return Array.isArray(p) ? p : [v] } catch { return [v] } }
         return []
       }
-      supabase.from('profiles').select('num_doctors, num_nurses, resources, rating, reviews_count, avatar_url, cover_url, location_maps, complexity')
+      supabase.from('accounts_public').select('num_doctors, num_nurses, resources, clinic_rating, clinic_reviews_count, avatar_url, cover_url, clinic_location, complexity')
         .eq('id', clinicId).single()
         .then(({ data }) => {
           if (!data) return
-          setClinicExtras({ num_doctors: data.num_doctors, num_nurses: data.num_nurses, resources: parseArr(data.resources), rating: data.rating, reviews_count: data.reviews_count, avatar_url: data.avatar_url, cover_url: data.cover_url, location_maps: data.location_maps, complexity: data.complexity })
+          setClinicExtras({ num_doctors: data.num_doctors, num_nurses: data.num_nurses, resources: parseArr(data.resources), rating: data.clinic_rating, reviews_count: data.clinic_reviews_count, avatar_url: data.avatar_url, cover_url: data.cover_url, location_maps: data.clinic_location, complexity: Array.isArray(data.complexity) ? data.complexity.join(', ') : data.complexity })
         })
     }
   }, [])
@@ -51,7 +51,7 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
     if (phone) { setCoordinatorPhone(phone.replace(/\D/g, '')); return }
     const clinicId = shift.clinic_id || shift.clinic?.id
     if (clinicId) {
-      supabase.from('profiles').select('whatsapp, phone').eq('id', clinicId).single()
+      supabase.from('accounts').select('whatsapp, phone').eq('id', clinicId).single()
         .then(({ data }) => { const n = data?.whatsapp || data?.phone; if (n) setCoordinatorPhone(n.replace(/\D/g, '')) })
     }
   }, [userStatus, shift?.clinic_id, shift?.clinic])
@@ -62,8 +62,8 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
       setIsCheckingSecurity(false)
       return
     }
-    const { data } = await supabase.from('profiles').select('is_verified').eq('id', user.id).single()
-    setIsVerified(data?.is_verified || false)
+    const { data } = await supabase.from('accounts').select('verified_at').eq('id', user.id).single()
+    setIsVerified(!!data?.verified_at)
     setIsCheckingSecurity(false)
   }
 
@@ -95,14 +95,22 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
   async function handleWithdraw() {
     if (!confirm('¿Querés retirar tu postulación?')) return
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { alert('Tu sesión expiró. Por favor, volvé a iniciar sesión.'); setLoading(false); return }
-    await supabase.from('shift_applications').update({ status: 'cancelled' }).eq('shift_id', shift.id).eq('professional_id', user.id).eq('status', 'pending')
+    try {
+      const res = await fetch('/api/shifts/cancel-assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_id: shift.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(data.error || 'Error al retirar postulación. Intentá de nuevo.'); setLoading(false); return }
+    } catch {
+      alert('Error de conexión. Intentá de nuevo.'); setLoading(false); return
+    }
     alert('Postulación retirada.'); onRefresh(); onClose()
   }
 
   async function handleCancelShift() {
-    const h = differenceInHours(parseISO(shift.date_time), new Date())
+    const h = differenceInHours(parseISO(shift.starts_at), new Date())
     const msg = h <= 24 && h > 0
       ? `⚠️ Faltan ${h} horas. Cancelar afectará tu reputación. ¿Continuar?`
       : `¿Dar de baja tu asistencia en ${shift.clinic?.full_name}?`
@@ -160,7 +168,7 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
   }
 
   const location = shift.clinic?.location_maps || clinicExtras?.location_maps || shift.clinic?.address || 'Ubicación no especificada'
-  const shiftDate = new Date(shift.date_time)
+  const shiftDate = new Date(shift.starts_at)
   const coverUrl = getPublicImageUrl(clinicExtras?.cover_url)
   const avatarUrl = getPublicImageUrl(clinicExtras?.avatar_url)
 
@@ -230,7 +238,7 @@ export default function DetalleGuardiaMedicoModal({ onClose, onRefresh, shift, u
               <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                 <Clock className="h-4 w-4 text-slate-400 shrink-0" />
                 <div>
-                  <p className="text-xs font-bold text-slate-800">{shift.duration_hours ?? '—'} hs</p>
+                  <p className="text-xs font-bold text-slate-800">{shift.ends_at && shift.starts_at ? Math.round((new Date(shift.ends_at).getTime() - new Date(shift.starts_at).getTime()) / 3600000) : '—'} hs</p>
                   <p className="text-emerald-600 font-black text-sm">{shift.price != null ? `$${Math.round(shift.price / 1000)}k` : '—'}</p>
                 </div>
               </div>

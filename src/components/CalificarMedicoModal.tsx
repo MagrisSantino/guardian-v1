@@ -6,36 +6,32 @@ export default function CalificarMedicoModal({ onClose, onRefresh, shift }: any)
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
   const [loading, setLoading] = useState(false)
-  const [doctor, setDoctor] = useState<any>(null)
+  const [doctorName, setDoctorName] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchDoctor()
-  }, [])
-
-  async function fetchDoctor() {
-    // Buscamos los datos del médico que cubrió esta guardia
-    const { data } = await supabase
-      .from('profiles')
-      .select('full_name, is_verified')
-      .eq('id', shift.professional_id)
+    const doctorId = shift?.assigned_doctor_id
+    if (!doctorId) return
+    supabase
+      .from('accounts_public')
+      .select('full_name')
+      .eq('id', doctorId)
       .single()
-    if (data) setDoctor(data)
-  }
+      .then(({ data }) => { if (data) setDoctorName(data.full_name) })
+  }, [shift?.assigned_doctor_id])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setLoading(false)
-      return
-    }
+    if (!user) { setLoading(false); return }
 
-    // 1. Insertar la reseña
+    const doctorId = shift?.assigned_doctor_id
+    if (!doctorId) { setLoading(false); return }
+
     const { error: reviewError } = await supabase.from('reviews').insert([{
       shift_id: shift.id,
       reviewer_id: user.id,
-      reviewed_id: shift.professional_id,
+      reviewed_id: doctorId,
       rating,
       comment,
     }])
@@ -46,24 +42,7 @@ export default function CalificarMedicoModal({ onClose, onRefresh, shift }: any)
       return
     }
 
-    // 2. Recalcular rating del médico en profiles
-    const { data: allReviews } = await supabase
-      .from('reviews')
-      .select('rating')
-      .eq('reviewed_id', shift.professional_id)
-
-    if (allReviews && allReviews.length > 0) {
-      const avg = allReviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / allReviews.length
-      await supabase
-        .from('profiles')
-        .update({
-          rating: Math.round(avg * 100) / 100,
-          reviews_count: allReviews.length,
-        })
-        .eq('id', shift.professional_id)
-    }
-
-    // 3. Marcar la guardia como completada
+    // Rating is updated by DB trigger — just mark the shift as completed
     const { error: shiftErr } = await supabase
       .from('shifts')
       .update({ status: 'completed' })
@@ -84,20 +63,18 @@ export default function CalificarMedicoModal({ onClose, onRefresh, shift }: any)
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white border border-slate-200 p-8 rounded-2xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-        
+
         <div className="text-center mb-6">
           <div className="h-16 w-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-3 shadow-sm border border-blue-100">
             ⭐
           </div>
           <h2 className="text-2xl font-bold text-slate-900">Calificar Guardia</h2>
           <p className="text-slate-500 text-sm mt-1">
-            Evaluá el desempeño de <strong className="text-slate-700">{doctor?.full_name || 'este profesional'}</strong>
+            Evaluá el desempeño de <strong className="text-slate-700">{doctorName || 'este profesional'}</strong>
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          
-          {/* Selector de Estrellas Interactivo */}
           <div className="flex flex-col items-center justify-center space-y-2">
             <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Puntuación</label>
             <div className="flex gap-2">
@@ -119,12 +96,12 @@ export default function CalificarMedicoModal({ onClose, onRefresh, shift }: any)
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Comentario (Opcional)</label>
-            <textarea 
-              value={comment} 
-              onChange={e => setComment(e.target.value)} 
-              placeholder="¿Cómo fue la experiencia? Ej: Llegó a horario y tuvo excelente trato." 
+            <textarea
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+              placeholder="¿Cómo fue la experiencia? Ej: Llegó a horario y tuvo excelente trato."
               rows={3}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700 resize-none" 
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-medium text-slate-700 resize-none"
             />
           </div>
 
@@ -137,7 +114,6 @@ export default function CalificarMedicoModal({ onClose, onRefresh, shift }: any)
             </button>
           </div>
         </form>
-
       </div>
     </div>
   )

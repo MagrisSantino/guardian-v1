@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint",
     "db:types": "npx supabase gen types typescript --project-id cztrvwzftzkoykcryzdl --schema public > src/lib/database.types.ts"
   },
@@ -22,7 +24,8 @@
     "nodemailer": "^8.0.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "resend": "^6.12.2"
+    "resend": "^6.12.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -32,6 +35,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.15",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.0.0"
   }
 }

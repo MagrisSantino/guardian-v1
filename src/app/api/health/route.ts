@@ -5,7 +5,7 @@ export async function GET() {
   const start = Date.now()
   try {
     const admin = createSupabaseAdmin()
-    const { error } = await admin.from('profiles').select('id').limit(1).maybeSingle()
+    const { error } = await admin.from('accounts').select('id').limit(1).maybeSingle()
     if (error) {
       return NextResponse.json(
         { ok: false, db: 'error', message: error.message, latency_ms: Date.now() - start },

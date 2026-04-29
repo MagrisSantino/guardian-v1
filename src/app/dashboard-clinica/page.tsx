@@ -132,7 +132,7 @@ function GuardiaCard({
 }) {
   const status = getGuardiaStatus(shift)
   const config = STATUS_CONFIG[status]
-  const shiftDate = parseISO(shift.date_time)
+  const shiftDate = parseISO(shift.starts_at)
   const amount = shift.price != null ? `${Math.round(shift.price / 1000)}k` : '—'
   const specialty = shift.specialty_required
   const now = new Date()
@@ -181,7 +181,7 @@ function GuardiaCardMobile({
 }) {
   const status = getGuardiaStatus(shift)
   const config = STATUS_CONFIG[status]
-  const shiftDate = parseISO(shift.date_time)
+  const shiftDate = parseISO(shift.starts_at)
   const amount = shift.price != null ? `${Math.round(shift.price / 1000)}k` : '—'
   const specialty = shift.specialty_required
   const now = new Date()
@@ -286,7 +286,7 @@ function DashboardClinicaContent() {
       .from('shifts')
       .select('*, applicants:shift_applications(status)')
       .eq('clinic_id', user.id)
-      .order('date_time', { ascending: true })
+      .order('starts_at', { ascending: true })
       .limit(200)
     if (data) setMyShifts(data)
   }
@@ -360,7 +360,7 @@ function DashboardClinicaContent() {
   const guardiasByDate = useMemo(() => {
     const map: Record<string, any[]> = {}
     myShifts.forEach((shift) => {
-      const key = format(parseISO(shift.date_time), 'yyyy-MM-dd')
+      const key = format(parseISO(shift.starts_at), 'yyyy-MM-dd')
       if (!map[key]) map[key] = []
       map[key].push(shift)
     })
@@ -368,7 +368,7 @@ function DashboardClinicaContent() {
   }, [myShifts])
 
   const monthShifts = useMemo(() => {
-    return myShifts.filter((s) => isSameMonth(parseISO(s.date_time), currentDate))
+    return myShifts.filter((s) => isSameMonth(parseISO(s.starts_at), currentDate))
   }, [myShifts, currentDate])
 
   const stats = useMemo(() => {
@@ -723,7 +723,7 @@ function DashboardClinicaContent() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
               <h3 className="text-lg font-bold text-slate-900">
-                Guardias del {format(parseISO(selectedDayShifts[0].date_time), "d 'de' MMMM", { locale: es })}
+                Guardias del {format(parseISO(selectedDayShifts[0].starts_at), "d 'de' MMMM", { locale: es })}
               </h3>
               <button
                 type="button"

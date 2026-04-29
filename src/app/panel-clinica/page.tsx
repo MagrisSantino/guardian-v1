@@ -70,7 +70,7 @@ function OfertaCard({
   shift: any
   onClick: () => void
 }) {
-  const d = parseISO(shift.date_time)
+  const d = parseISO(shift.starts_at)
   const category = shift.shift_category || 'Guardia'
   const specialty = shift.specialty_required || '—'
   const guardiaStatus = getGuardiaStatus(shift)
@@ -130,9 +130,9 @@ function PanelClinicaContent() {
     setLoading(true)
     const { data } = await supabase
       .from('shifts')
-      .select('*, applicants:shift_applications(status), professional:profiles!professional_id(full_name, whatsapp, phone, is_verified)')
+      .select('*, applicants:shift_applications(status)')
       .eq('clinic_id', user.id)
-      .order('date_time', { ascending: true })
+      .order('starts_at', { ascending: true })
     setShifts(data || [])
     setLoading(false)
   }
@@ -142,7 +142,7 @@ function PanelClinicaContent() {
       fetchShifts().then(() => {
         supabase
           .from('shifts')
-          .select('*, applicants:shift_applications(status), professional:profiles!professional_id(full_name, whatsapp, phone, is_verified)')
+          .select('*, applicants:shift_applications(status)')
           .eq('id', shiftIdParam)
           .single()
           .then(({ data: shift }) => {
@@ -223,7 +223,16 @@ function PanelClinicaContent() {
                   shift={shift}
                   onClick={() => {
                     setShiftToManage(shift)
-                    setIsPostulantesOpen(true)
+                    setIsPostulantesOpen(false)
+                    setIsVerGuardiaAsignadaOpen(false)
+                    setIsCalificarOpen(false)
+                    if (shift.status === 'filled') {
+                      setIsVerGuardiaAsignadaOpen(true)
+                    } else if (shift.status === 'completed') {
+                      alert('Esta guardia ya fue finalizada.')
+                    } else {
+                      setIsPostulantesOpen(true)
+                    }
                   }}
                 />
               ))}

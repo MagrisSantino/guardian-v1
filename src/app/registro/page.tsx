@@ -352,18 +352,16 @@ export default function RegistroPage() {
     // getUser() valida el JWT contra Supabase; evita redirigir con sesiones expiradas/corruptas.
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setCheckingSession(false); return }
-      const { data: profile } = await supabase
-        .from('profiles')
+      const { data: account } = await supabase
+        .from('accounts')
         .select('role')
         .eq('id', user.id)
         .maybeSingle()
-      // Solo redirigir si el perfil tiene un rol válido.
-      // Si no hay rol (perfil incompleto o recién creado), cerrar sesión y mostrar el formulario.
-      if (profile?.role === 'super_admin') {
+      if (account?.role === 'admin') {
         window.location.href = '/super-admin-guardian'
-      } else if (profile?.role === 'clinic_admin') {
+      } else if (account?.role === 'clinic') {
         window.location.href = '/dashboard-clinica'
-      } else if (profile?.role === 'doctor') {
+      } else if (account?.role === 'doctor') {
         window.location.href = '/dashboard-medico'
       } else {
         await supabase.auth.signOut()

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, differenceInHours } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   AlertTriangle,
@@ -13,9 +13,9 @@ import {
   MapPin,
   Activity,
   ClipboardList,
+  Briefcase,
 } from 'lucide-react'
 import { useGoogleMapsLoaded } from '@/components/GoogleMapsProvider'
-import { Briefcase } from 'lucide-react'
 
 type ViewMode = 'grid' | 'list'
 
@@ -54,37 +54,36 @@ function formatPrice(price: number | null | undefined): string {
   }).format(value)
 }
 
+// Module-level geo cache to avoid redundant geocoding within the same session
+const geoCache = new Map<string, number>()
+
 export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverlap, onClick }: GuardiaCardProps) {
   const isGrid = viewMode === 'grid'
   const clinic = shift.clinic || shift.profiles || shift.profile || {}
   const clinicName = clinic.full_name || 'Clínica'
-  const location = clinic.location_maps || clinic.address || 'Ubicación no especificada'
+  const location = clinic.clinic_location || clinic.location_maps || clinic.address || 'Ubicación no especificada'
   const coverUrl = clinic.cover_url || clinic.avatar_url || null
 
-  const shiftDate = parseISO(shift.date_time)
-  const durationHours = shift.duration_hours ?? 0
-  const category: string = shift.shift_category || 'Guardia'
+  const shiftDate = parseISO(shift.starts_at)
+  const durationHours = shift.ends_at && shift.starts_at
+    ? differenceInHours(parseISO(shift.ends_at), parseISO(shift.starts_at))
+    : 0
+  const category: string = shift.shift_category || 'guardia'
   const viaticos = shift.viaticos ?? 'No'
 
   const CategoryIcon =
-    category === 'Guardia' ? Activity : category === 'Consultorio' ? ClipboardList : Ambulance
+    category === 'guardia' ? Activity : category === 'consultorio' ? ClipboardList : Ambulance
   const categoryClass =
-    category === 'Guardia'
+    category === 'guardia'
       ? 'border-blue-100 bg-blue-50 text-blue-700'
-      : category === 'Consultorio'
+      : category === 'consultorio'
         ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
         : 'border-rose-100 bg-rose-50 text-rose-700'
+  const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1)
 
   const incompatible = !!hasOverlap
   const mapsLoaded = useGoogleMapsLoaded()
-  const geoKey = `geo_${location}`
-  const [distanceKm, setDistanceKm] = useState<number | null>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem(geoKey)
-      return cached !== null ? Number(cached) : null
-    }
-    return null
-  })
+  const [distanceKm, setDistanceKm] = useState<number | null>(() => geoCache.get(location) ?? null)
 
   useEffect(() => {
     if (!mapsLoaded || distanceKm != null || !location) return
@@ -95,23 +94,19 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
         const loc = results[0].geometry.location
         const d = Math.round(haversineKm(loc.lat(), loc.lng(), CBA_CAPITAL.lat, CBA_CAPITAL.lng))
         setDistanceKm(d)
-        sessionStorage.setItem(geoKey, String(d))
+        geoCache.set(location, d)
       }
     })
-  }, [mapsLoaded, location, distanceKm, geoKey])
+  }, [mapsLoaded, location, distanceKm])
 
   const distanceLabel = distanceKm != null ? `a ${distanceKm}km de Córdoba Capital` : null
-
-  const handleClick = () => {
-    if (onClick) onClick()
-  }
 
   return (
     <div
       className={`group relative overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all duration-300 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-100/40 ${
         isGrid ? 'flex flex-col' : 'flex flex-row items-center'
       } ${incompatible ? 'border-l-4 border-l-amber-400' : isConfirmed ? 'border-l-4 border-l-emerald-500' : hasApplied ? 'border-l-4 border-l-orange-400' : ''}`}
-      onClick={handleClick}
+      onClick={onClick}
     >
       {/* Imagen / portada */}
       {isGrid && (
@@ -153,7 +148,6 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
               )}
             </div>
           </div>
-          {/* Badges superpuestos en la foto (grid) */}
           {isConfirmed && (
             <div className="absolute left-3 top-3">
               <div className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-black text-white shadow-md">
@@ -205,7 +199,6 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
       )}
 
       <div className={`flex-1 ${isGrid ? 'p-5' : 'flex flex-col justify-center gap-2 px-4 py-3'}`}>
-        {/* Nombre clínica (solo lista, en grid ya va en la imagen) */}
         {!isGrid && (
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 overflow-hidden shrink-0">
@@ -238,16 +231,14 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
           </div>
         )}
 
-        {/* Dirección + distancia */}
         <div className="mt-1 mb-3 flex items-start gap-2 text-xs sm:text-sm text-slate-600">
           <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
           <div className="flex flex-col">
             <span>{location}</span>
-            <span className="text-[11px] text-slate-500">{distanceLabel}</span>
+            {distanceLabel && <span className="text-[11px] text-slate-500">{distanceLabel}</span>}
           </div>
         </div>
 
-        {/* Fecha, hora inicio, duración, viáticos */}
         <div className="mb-3 flex flex-col gap-1 text-xs sm:text-sm text-slate-600">
           <div className="flex items-center gap-1.5">
             <Calendar className="h-4 w-4 text-slate-400" />
@@ -258,12 +249,8 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
           <div className="flex items-center gap-1.5">
             <Clock className="h-4 w-4 text-slate-400" />
             <span className="font-medium">
-              Hora inicio: {format(shiftDate, 'HH:mm')} hs
+              {format(shiftDate, 'HH:mm')} — {shift.ends_at ? format(parseISO(shift.ends_at), 'HH:mm') : '—'} hs ({durationHours}h)
             </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Clock className="h-4 w-4 text-slate-400" />
-            <span className="font-medium">{durationHours} hs</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Briefcase className="h-4 w-4 text-slate-400" />
@@ -273,45 +260,42 @@ export function GuardiaCard({ shift, viewMode, hasApplied, isConfirmed, hasOverl
           </div>
         </div>
 
-          {/* Grid mode: badge + precio + botón al pie */}
-          {isGrid && (
-            <>
-              <div className="mt-auto flex items-end justify-between gap-3 border-t border-slate-100 pt-3">
-                <div className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${categoryClass}`}>
-                  <CategoryIcon className="h-3.5 w-3.5" />
-                  <span className="uppercase tracking-wide">{category}</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-medium text-slate-500">Honorarios</p>
-                  <p className="text-lg sm:text-xl font-bold tracking-tight text-emerald-600">{formatPrice(shift.price)}</p>
-                </div>
+        {isGrid && (
+          <>
+            <div className="mt-auto flex items-end justify-between gap-3 border-t border-slate-100 pt-3">
+              <div className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${categoryClass}`}>
+                <CategoryIcon className="h-3.5 w-3.5" />
+                <span className="uppercase tracking-wide">{categoryLabel}</span>
               </div>
-              <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-                <button type="button" onClick={handleClick} className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
-                  Ver detalles y postularme
-                </button>
+              <div className="text-right">
+                <p className="text-xs font-medium text-slate-500">Honorarios</p>
+                <p className="text-lg sm:text-xl font-bold tracking-tight text-emerald-600">{formatPrice(shift.price)}</p>
               </div>
-            </>
-          )}
-        </div>
-
-        {/* List mode: columna derecha con badge + precio + botón, centrados verticalmente */}
-        {!isGrid && (
-          <div className="flex shrink-0 flex-col items-center justify-center gap-3 border-l border-slate-100 px-5 py-4">
-            <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${categoryClass}`}>
-              <CategoryIcon className="h-3.5 w-3.5" />
-              <span className="uppercase tracking-wide">{category}</span>
             </div>
-            <div className="text-center">
-              <p className="text-xs font-medium text-slate-500">Honorarios</p>
-              <p className="text-xl font-bold tracking-tight text-emerald-600">{formatPrice(shift.price)}</p>
+            <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+              <button type="button" onClick={onClick} className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
+                Ver detalles y postularme
+              </button>
             </div>
-            <button type="button" onClick={handleClick} className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 whitespace-nowrap">
-              Ver detalles
-            </button>
-          </div>
+          </>
         )}
+      </div>
+
+      {!isGrid && (
+        <div className="flex shrink-0 flex-col items-center justify-center gap-3 border-l border-slate-100 px-5 py-4">
+          <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${categoryClass}`}>
+            <CategoryIcon className="h-3.5 w-3.5" />
+            <span className="uppercase tracking-wide">{categoryLabel}</span>
+          </div>
+          <div className="text-center">
+            <p className="text-xs font-medium text-slate-500">Honorarios</p>
+            <p className="text-xl font-bold tracking-tight text-emerald-600">{formatPrice(shift.price)}</p>
+          </div>
+          <button type="button" onClick={onClick} className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 whitespace-nowrap">
+            Ver detalles
+          </button>
+        </div>
+      )}
     </div>
   )
 }
-

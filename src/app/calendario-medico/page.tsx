@@ -17,7 +17,7 @@ import {
   eachDayOfInterval,
   parseISO,
 } from 'date-fns'
-import { hasIncompatibleAssignedShift, type AssignedShiftBlock } from '@/lib/shiftOverlap'
+import { hasConflict, type AssignedShiftBlock } from '@/lib/shiftOverlap'
 import { es } from 'date-fns/locale'
 import { useSearchParams, usePathname, useRouter } from 'next/navigation'
 import {
@@ -160,7 +160,7 @@ function GuardiaCard({
 }) {
   const status = getUserStatus(shift)
   const config = STATUS_CONFIG[status]
-  const shiftDate = parseISO(shift.date_time)
+  const shiftDate = parseISO(shift.starts_at)
   const amount = `${Math.round(shift.price / 1000)}k`
   const clinicName = shift.clinic?.full_name || 'Clínica'
   const specialty = shift.specialty_required
@@ -215,7 +215,7 @@ function GuardiaCardMobile({
 }) {
   const status = getUserStatus(shift)
   const config = STATUS_CONFIG[status]
-  const shiftDate = parseISO(shift.date_time)
+  const shiftDate = parseISO(shift.starts_at)
   const amount = `${Math.round(shift.price / 1000)}k`
   const clinicName = shift.clinic?.full_name || 'Clínica'
   const specialty = shift.specialty_required
@@ -294,35 +294,9 @@ function StatCard({
    ───────────────────────────────────────────── */
 
 function CalendarioMedicoContent() {
-  const [shifts, setShifts] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('medico_calendar_cache')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        sessionStorage.removeItem('medico_calendar_cache')
-      }
-    }
-    return []
-  })
+  const [shifts, setShifts] = useState<any[]>([])
 
-  const [myApplications, setMyApplications] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('medico_apps_cache')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        sessionStorage.removeItem('medico_apps_cache')
-      }
-    }
-    return []
-  })
+  const [myApplications, setMyApplications] = useState<string[]>([])
 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [userId, setUserId] = useState<string | null>(null)
@@ -331,64 +305,15 @@ function CalendarioMedicoContent() {
   const [selectedUserStatus, setSelectedUserStatus] = useState<string>('')
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null)
   const [legendOpen, setLegendOpen] = useState(false)
-  const [myConfirmedShifts, setMyConfirmedShifts] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('medico_confirmed_cache')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        sessionStorage.removeItem('medico_confirmed_cache')
-      }
-    }
-    return []
-  })
-  const [blockedDates, setBlockedDates] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('medico_blocked_cache')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        sessionStorage.removeItem('medico_blocked_cache')
-      }
-    }
-    return []
-  })
-  const [selectedBlockedDates, setSelectedBlockedDates] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('medico_blocked_cache')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        sessionStorage.removeItem('medico_blocked_cache')
-      }
-    }
-    return []
-  })
+  const [myConfirmedShifts, setMyConfirmedShifts] = useState<any[]>([])
+  const [blockedDates, setBlockedDates] = useState<string[]>([])
+  const [selectedBlockedDates, setSelectedBlockedDates] = useState<string[]>([])
   const [isSelectingDays, setIsSelectingDays] = useState(false)
   const [selectedDayShifts, setSelectedDayShifts] = useState<any[] | null>(null)
   const [selectedShiftForModal, setSelectedShiftForModal] = useState<any | null>(null)
 
-  function checkOverlap(shiftDate: Date, durationHours: number, excludeShiftId?: string): boolean {
-    const blocks: AssignedShiftBlock[] = myConfirmedShifts.map((c) => ({
-      id: c.id,
-      date_time: c.date_time,
-      duration_hours: c.duration_hours ?? null,
-    }))
-    return hasIncompatibleAssignedShift(
-      shiftDate,
-      durationHours,
-      blocks,
-      excludeShiftId ?? '',
-    )
+  function checkOverlap(shift: { id: string; starts_at: string; ends_at: string }): boolean {
+    return hasConflict(shift, myConfirmedShifts)
   }
 
   const searchParams = useSearchParams()
@@ -407,55 +332,51 @@ function CalendarioMedicoContent() {
     setUserId(user.id)
 
     const { data: profile } = await supabase
-      .from('profiles')
+      .from('doctor_profiles')
       .select('blocked_dates')
       .eq('id', user.id)
       .single()
 
     const { data: openShifts } = await supabase
       .from('shifts')
-      .select('*, clinic:profiles!clinic_id(*)')
+      .select('*, clinic:accounts_public!clinic_id(id,full_name,avatar_url,cover_url,clinic_location,clinic_rating,clinic_reviews_count,num_doctors,num_nurses,resources,complexity)')
       .eq('status', 'open')
-      .order('date_time', { ascending: true })
+      .order('starts_at', { ascending: true })
       .limit(50)
     const { data: myShifts } = await supabase
       .from('shifts')
-      .select('*, clinic:profiles!clinic_id(*)')
-      .eq('professional_id', user.id)
-      .order('date_time', { ascending: true })
+      .select('*, clinic:accounts_public!clinic_id(id,full_name,avatar_url,cover_url,clinic_location,clinic_rating,clinic_reviews_count,num_doctors,num_nurses,resources,complexity)')
+      .eq('assigned_doctor_id', user.id)
+      .order('starts_at', { ascending: true })
       .limit(200)
     const { data: appsData } = await supabase
       .from('shift_applications')
       .select('shift_id')
-      .eq('professional_id', user.id)
+      .eq('doctor_id', user.id)
       .eq('status', 'pending')
       .order('id', { ascending: false })
     const { data: confirmedData } = await supabase
       .from('shifts')
-      .select('id, date_time, duration_hours')
-      .eq('professional_id', user.id)
+      .select('id, starts_at, ends_at')
+      .eq('assigned_doctor_id', user.id)
       .eq('status', 'filled')
-      .order('date_time', { ascending: true })
+      .order('starts_at', { ascending: true })
 
     const blocked = Array.isArray(profile?.blocked_dates) ? profile.blocked_dates : []
     setBlockedDates(blocked)
-    sessionStorage.setItem('medico_blocked_cache', JSON.stringify(blocked))
     if (!isSelectingDays) setSelectedBlockedDates(blocked)
 
     if (confirmedData) {
       setMyConfirmedShifts(confirmedData)
-      sessionStorage.setItem('medico_confirmed_cache', JSON.stringify(confirmedData))
     }
     if (appsData) {
       const apps = appsData.map((a: { shift_id: string }) => a.shift_id)
       setMyApplications(apps)
-      sessionStorage.setItem('medico_apps_cache', JSON.stringify(apps))
     }
 
     const combined = [...(openShifts || []), ...(myShifts || [])]
     const uniqueShifts = Array.from(new Map(combined.map((item: any) => [item.id, item])).values())
     setShifts(uniqueShifts)
-    sessionStorage.setItem('medico_calendar_cache', JSON.stringify(uniqueShifts))
   }
 
   useEffect(() => {
@@ -463,7 +384,7 @@ function CalendarioMedicoContent() {
       fetchData().then(() => {
         supabase
           .from('shifts')
-          .select('*, clinic:profiles!clinic_id(*)')
+          .select('*, clinic:accounts_public!clinic_id(id,full_name,avatar_url,cover_url,clinic_location,clinic_rating,clinic_reviews_count,num_doctors,num_nurses,resources,complexity)')
           .eq('id', shiftIdParam)
           .single()
           .then(({ data: shift }) => {
@@ -472,13 +393,13 @@ function CalendarioMedicoContent() {
                 .from('shift_applications')
                 .select('id')
                 .eq('shift_id', shift.id)
-                .eq('professional_id', userId)
+                .eq('assigned_doctor_id', userId)
                 .eq('status', 'pending')
                 .single()
                 .then(({ data: app }) => {
                   let status = 'disponible'
-                  if (shift.status === 'completed' && shift.professional_id === userId) status = 'completada'
-                  else if (shift.status === 'filled' && shift.professional_id === userId) status = 'confirmado'
+                  if (shift.status === 'completed' && shift.assigned_doctor_id === userId) status = 'completada'
+                  else if (shift.status === 'filled' && shift.assigned_doctor_id === userId) status = 'confirmado'
                   else if (app) status = 'postulado'
 
                   setSelectedShift(shift)
@@ -492,8 +413,8 @@ function CalendarioMedicoContent() {
   }, [shiftIdParam, userId, pathname, router])
 
   const getUserStatus = (shift: any): UserStatus => {
-    if (shift.status === 'completed' && shift.professional_id === userId) return 'completada'
-    if (shift.status === 'filled' && shift.professional_id === userId) return 'confirmado'
+    if (shift.status === 'completed' && shift.assigned_doctor_id === userId) return 'completada'
+    if (shift.status === 'filled' && shift.assigned_doctor_id === userId) return 'confirmado'
     if (shift.status === 'open' && myApplications.includes(shift.id)) return 'postulado'
     return 'disponible'
   }
@@ -533,7 +454,7 @@ function CalendarioMedicoContent() {
   const saveBlockedDates = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    await supabase.from('profiles').update({ blocked_dates: selectedBlockedDates }).eq('id', user.id)
+    await supabase.from('doctor_profiles').update({ blocked_dates: selectedBlockedDates }).eq('id', user.id)
     setBlockedDates(selectedBlockedDates)
     setIsSelectingDays(false)
   }
@@ -553,7 +474,7 @@ function CalendarioMedicoContent() {
   const guardiasByDate = useMemo(() => {
     const map: Record<string, any[]> = {}
     shifts.forEach((shift) => {
-      const key = format(parseISO(shift.date_time), 'yyyy-MM-dd')
+      const key = format(parseISO(shift.starts_at), 'yyyy-MM-dd')
       if (!map[key]) map[key] = []
       map[key].push(shift)
     })
@@ -561,7 +482,7 @@ function CalendarioMedicoContent() {
   }, [shifts])
 
   const monthShifts = useMemo(() => {
-    return shifts.filter((s) => isSameMonth(parseISO(s.date_time), currentDate))
+    return shifts.filter((s) => isSameMonth(parseISO(s.starts_at), currentDate))
   }, [shifts, currentDate])
 
   const stats = useMemo(() => {
@@ -858,7 +779,7 @@ function CalendarioMedicoContent() {
                               shift={g}
                               getUserStatus={getUserStatus}
                               onShiftClick={handleShiftClick}
-                              hasOverlap={getUserStatus(g) === 'disponible' && checkOverlap(parseISO(g.date_time), Number(g.duration_hours) || 0, g.id)}
+                              hasOverlap={getUserStatus(g) === 'disponible' && checkOverlap(g)}
                             />
                           ))}
                           {restCount > 0 && (
@@ -948,14 +869,7 @@ function CalendarioMedicoContent() {
                                   shift={shift}
                                   getUserStatus={getUserStatus}
                                   onShiftClick={() => {}}
-                                  hasOverlap={
-                                    getUserStatus(shift) === 'disponible' &&
-                                    checkOverlap(
-                                      parseISO(shift.date_time),
-                                      Number(shift.duration_hours) || 0,
-                                      shift.id
-                                    )
-                                  }
+                                  hasOverlap={getUserStatus(shift) === 'disponible' && checkOverlap(shift)}
                                 />
                               </div>
                             ))}
@@ -995,7 +909,7 @@ function CalendarioMedicoContent() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
               <h3 className="text-lg font-bold text-slate-900">
-                Guardias del {format(parseISO(selectedDayShifts[0].date_time), "d 'de' MMMM", { locale: es })}
+                Guardias del {format(parseISO(selectedDayShifts[0].starts_at), "d 'de' MMMM", { locale: es })}
               </h3>
               <button
                 type="button"
@@ -1018,10 +932,7 @@ function CalendarioMedicoContent() {
                     shift={s}
                     getUserStatus={getUserStatus}
                     onShiftClick={() => {}}
-                    hasOverlap={
-                      getUserStatus(s) === 'disponible' &&
-                      checkOverlap(parseISO(s.date_time), Number(s.duration_hours) || 0, s.id)
-                    }
+                    hasOverlap={getUserStatus(s) === 'disponible' && checkOverlap(s)}
                   />
                 </div>
               ))}
@@ -1034,7 +945,7 @@ function CalendarioMedicoContent() {
         <DetalleGuardiaMedicoModal
           shift={selectedShift}
           userStatus={selectedUserStatus}
-          hasOverlap={selectedUserStatus === 'disponible' && checkOverlap(parseISO(selectedShift.date_time), Number(selectedShift.duration_hours) || 0, selectedShift.id)}
+          hasOverlap={selectedUserStatus === 'disponible' && checkOverlap(selectedShift)}
           onClose={() => setSelectedShift(null)}
           onRefresh={fetchData}
         />
@@ -1044,14 +955,7 @@ function CalendarioMedicoContent() {
         <ExplorarGuardiaModal
           shift={selectedShiftForModal}
           hasApplied={myApplications.includes(selectedShiftForModal.id)}
-          hasOverlap={
-            selectedShiftForModal.status === 'open' &&
-            checkOverlap(
-              parseISO(selectedShiftForModal.date_time),
-              Number(selectedShiftForModal.duration_hours) || 0,
-              selectedShiftForModal.id
-            )
-          }
+          hasOverlap={selectedShiftForModal.status === 'open' && checkOverlap(selectedShiftForModal)}
           onClose={() => setSelectedShiftForModal(null)}
         />
       )}

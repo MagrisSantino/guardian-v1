@@ -7,30 +7,36 @@ import { es } from 'date-fns/locale'
 import { MessageCircle, Calendar, Clock } from 'lucide-react'
 
 export default function VerGuardiaAsignadaModal({ onClose, onRefresh, shift, onFinalize }: { onClose: () => void; onRefresh: () => void; shift: any; onFinalize: () => void }) {
-  const [professional, setProfessional] = useState<any>(shift?.professional ?? null)
+  const [doctor, setDoctor] = useState<any>(null)
+  const [contact, setContact] = useState<{ whatsapp?: string | null; phone?: string | null } | null>(null)
   const [unassigning, setUnassigning] = useState(false)
 
-  const shiftDate = shift?.date_time ? parseISO(shift.date_time) : null
+  const shiftDate = shift?.starts_at ? parseISO(shift.starts_at) : null
   const todayStart = startOfDay(new Date())
   const shiftDayStart = shiftDate ? startOfDay(shiftDate) : null
   const canFinalize = shiftDayStart != null && !isBefore(todayStart, shiftDayStart)
 
   useEffect(() => {
-    // Use joined data if available; only fetch separately as fallback
-    if (shift?.professional?.full_name) {
-      setProfessional(shift.professional)
-      return
-    }
-    if (!shift?.professional_id) return
-    supabase
-      .from('profiles')
-      .select('full_name, whatsapp, phone, is_verified')
-      .eq('id', shift.professional_id)
-      .single()
-      .then(({ data }) => { if (data) setProfessional(data) })
-  }, [shift?.professional_id, shift?.professional])
+    const doctorId = shift?.assigned_doctor_id
+    if (!doctorId) return
+    Promise.all([
+      supabase
+        .from('accounts_public')
+        .select('full_name, is_verified')
+        .eq('id', doctorId)
+        .single(),
+      supabase
+        .from('accounts')
+        .select('whatsapp, phone')
+        .eq('id', doctorId)
+        .single(),
+    ]).then(([pubRes, contactRes]) => {
+      if (pubRes.data) setDoctor(pubRes.data)
+      if (contactRes.data) setContact(contactRes.data)
+    })
+  }, [shift?.assigned_doctor_id])
 
-  const waNumber = (professional?.whatsapp || professional?.phone)?.replace(/\D/g, '')
+  const waNumber = (contact?.whatsapp || contact?.phone)?.replace(/\D/g, '')
 
   async function handleUnassign() {
     if (!confirm('¿Desasignar a este médico? La guardia volverá a estar abierta para que otro profesional se postule.')) return
@@ -39,7 +45,7 @@ export default function VerGuardiaAsignadaModal({ onClose, onRefresh, shift, onF
       const res = await fetch('/api/shifts/cancel-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shift_id: shift.id, actor: 'clinic' }),
+        body: JSON.stringify({ shift_id: shift.id }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -59,7 +65,7 @@ export default function VerGuardiaAsignadaModal({ onClose, onRefresh, shift, onF
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white border border-slate-200 p-6 md:p-8 rounded-2xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-white border border-slate-200 p-6 md:p-8 rounded-2xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-600 to-emerald-500 rounded-t-2xl" />
 
         <h2 className="text-xl font-bold text-slate-900 mb-1">Guardia asignada</h2>
@@ -72,7 +78,11 @@ export default function VerGuardiaAsignadaModal({ onClose, onRefresh, shift, onF
           </div>
           <div className="flex items-center gap-2 text-slate-700">
             <Clock className="h-4 w-4 text-slate-400" />
-            <span className="font-medium">{shiftDate ? format(shiftDate, 'HH:mm') : '—'}hs · ${shift?.price?.toLocaleString()}</span>
+            <span className="font-medium">
+              {shiftDate ? format(shiftDate, 'HH:mm') : '—'}
+              {shift?.ends_at ? ` — ${format(parseISO(shift.ends_at), 'HH:mm')}` : ''}
+              {' '}hs · ${shift?.price?.toLocaleString()}
+            </span>
           </div>
         </div>
 
@@ -80,8 +90,8 @@ export default function VerGuardiaAsignadaModal({ onClose, onRefresh, shift, onF
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Profesional asignado</p>
           <div className="flex items-center justify-between gap-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
             <div>
-              <p className="font-bold text-slate-900">{professional?.full_name || '—'}</p>
-              {professional?.is_verified && (
+              <p className="font-bold text-slate-900">{doctor?.full_name || '—'}</p>
+              {doctor?.is_verified && (
                 <span className="text-xs text-emerald-700 font-medium">Verificado</span>
               )}
             </div>

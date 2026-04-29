@@ -229,12 +229,12 @@ function LoginPageInner() {
   }
 
   function redirectByRole(role: string | null | undefined) {
-    if (role === 'super_admin') {
+    if (role === 'admin') {
       window.location.href = '/super-admin-guardian'
       return true
     }
-    if (role === 'clinic_admin') {
-      window.location.href = '/dashboard-clinica'
+    if (role === 'clinic') {
+      window.location.href = '/panel-clinica'
       return true
     }
     if (role === 'doctor') {
@@ -289,7 +289,7 @@ function LoginPageInner() {
       }
 
       supabase
-        .from('profiles')
+        .from('accounts')
         .select('role')
         .eq('id', user.id)
         .maybeSingle()
@@ -325,29 +325,12 @@ function LoginPageInner() {
     } else {
       await ensureProfileExists()
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('accounts')
         .select('role')
         .eq('id', data.user.id)
         .maybeSingle()
 
       if (profile?.role === 'doctor') {
-        const [openRes, myRes] = await Promise.all([
-          supabase
-            .from('shifts')
-            .select('*, clinic:profiles!clinic_id(full_name)')
-            .eq('status', 'open')
-            .order('date_time', { ascending: true })
-            .limit(50),
-          supabase
-            .from('shifts')
-            .select('*, clinic:profiles!clinic_id(full_name)')
-            .eq('professional_id', data.user.id)
-            .eq('status', 'filled')
-            .order('date_time', { ascending: true }),
-        ])
-        if (openRes.data) sessionStorage.setItem('medico_feed_cache', JSON.stringify(openRes.data))
-        const allCalendarShifts = [...(openRes.data || []), ...(myRes.data || [])]
-        sessionStorage.setItem('medico_calendar_cache', JSON.stringify(allCalendarShifts))
         window.location.href = '/dashboard-medico'
         return
       }

@@ -6,179 +6,83 @@ import SkeletonGuardia from '@/components/SkeletonGuardia'
 import { FilterBar } from '@/components/FilterBar'
 import { GuardiaCard } from '@/components/GuardiaCard'
 import { format, parseISO } from 'date-fns'
-import { hasIncompatibleAssignedShift, type AssignedShiftBlock } from '@/lib/shiftOverlap'
-import { es } from 'date-fns/locale'
-import { Activity, CalendarDays, Ambulance } from 'lucide-react'
+import { hasConflict, type AssignedShiftBlock } from '@/lib/shiftOverlap'
 
 export default function DashboardMedico() {
-  const [shifts, setShifts] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('medico_feed_cache')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        sessionStorage.removeItem('medico_feed_cache')
-      }
-    }
-    return []
-  })
-
-  // --- MAGIA: CACHÉ SÍNCRONO DE POSTULACIONES ---
-  const [myApplications, setMyApplications] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('medico_apps_cache')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        sessionStorage.removeItem('medico_apps_cache')
-      }
-    }
-    return []
-  })
-  
+  const [shifts, setShifts] = useState<any[]>([])
+  const [myApplications, setMyApplications] = useState<string[]>([])
+  const [myConfirmedShifts, setMyConfirmedShifts] = useState<AssignedShiftBlock[]>([])
+  const [isVerified, setIsVerified] = useState(false)
+  const [doctorSpecialty, setDoctorSpecialty] = useState<string[]>([])
+  const [doctorSpecialtyVerified, setDoctorSpecialtyVerified] = useState<string[]>([])
   const [loadingBtn, setLoadingBtn] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
-  const [isFetching, setIsFetching] = useState(true) 
+  const [isFetching, setIsFetching] = useState(true)
   const [selectedShift, setSelectedShift] = useState<any>(null)
-
   const [searchTerm, setSearchTerm] = useState('')
   const [filterFromDate, setFilterFromDate] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedSpecialty, setSelectedSpecialty] = useState('Todas')
   const [sortBy, setSortBy] = useState<'recent' | 'price_high' | 'price_low'>('recent')
-  const [myConfirmedShifts, setMyConfirmedShifts] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('medico_confirmed_cache')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        sessionStorage.removeItem('medico_confirmed_cache')
-      }
-    }
-    return []
-  })
 
-  // Especialidades del médico (objetos completos con verified) — para filtrar el feed y el modal
-  // null = todavía no se cargó del server; [] = sin especialidades (ve todo); [...] = lista
-  const [doctorSpecialties, setDoctorSpecialties] = useState<{name: string; verified: boolean}[] | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('medico_specialties_cache')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        sessionStorage.removeItem('medico_specialties_cache')
-      }
-    }
-    return null
-  })
-
-  function checkOverlap(shiftDate: Date, durationHours: number, excludeShiftId?: string): boolean {
-    const blocks: AssignedShiftBlock[] = myConfirmedShifts.map((c) => ({
-      id: c.id,
-      date_time: c.date_time,
-      duration_hours: c.duration_hours ?? null,
-    }))
-    return hasIncompatibleAssignedShift(
-      shiftDate,
-      durationHours,
-      blocks,
-      excludeShiftId ?? '',
-    )
-  }
-
-  useEffect(() => { 
+  useEffect(() => {
     setMounted(true)
-    fetchShiftsAndApplications() 
+    fetchAll()
   }, [])
 
-  const fetchShiftsAndApplications = async () => {
+  async function fetchAll() {
     setIsFetching(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return;
-    const session = { user }
+    if (!user) return
 
-    const [shiftsRes, appsRes, confirmedRes, profileRes] = await Promise.all([
+    const [shiftsRes, appsRes, confirmedRes, accountRes, profileRes] = await Promise.all([
       supabase
         .from('shifts')
-        .select('*, clinic:profiles!clinic_id(id,full_name,avatar_url,cover_url,location_maps,rating,reviews_count,num_doctors,num_nurses,resources,complexity)')
+        .select('*, clinic:accounts_public!clinic_id(id,full_name,avatar_url,cover_url,clinic_location,clinic_rating,clinic_reviews_count,num_doctors,num_nurses,resources,complexity)')
         .eq('status', 'open')
-        .order('date_time', { ascending: true })
+        .order('starts_at', { ascending: true })
         .limit(50),
       supabase
         .from('shift_applications')
         .select('shift_id')
-        .eq('professional_id', session.user.id)
-        .eq('status', 'pending')
-        .order('id', { ascending: false }),
+        .eq('doctor_id', user.id)
+        .eq('status', 'pending'),
       supabase
         .from('shifts')
-        .select('id, date_time, duration_hours')
-        .eq('professional_id', session.user.id)
-        .eq('status', 'filled')
-        .order('date_time', { ascending: true }),
+        .select('id, starts_at, ends_at')
+        .eq('assigned_doctor_id', user.id)
+        .eq('status', 'filled'),
       supabase
-        .from('profiles')
-        .select('is_verified, specialty')
-        .eq('id', session.user.id)
+        .from('accounts')
+        .select('verified_at')
+        .eq('id', user.id)
+        .single(),
+      supabase
+        .from('doctor_profiles')
+        .select('specialty, specialty_verified')
+        .eq('id', user.id)
         .single(),
     ])
 
-    if (shiftsRes.data) {
-      setShifts(shiftsRes.data)
-      sessionStorage.setItem('medico_feed_cache', JSON.stringify(shiftsRes.data))
-      // Sync calendar cache: keep user's personal (non-open) shifts, replace open shifts with fresh data
-      try {
-        const existing: any[] = JSON.parse(sessionStorage.getItem('medico_calendar_cache') || '[]')
-        const personal = existing.filter((s: any) => s.status !== 'open')
-        const merged = [...shiftsRes.data, ...personal]
-        const unique = Array.from(new Map(merged.map((s: any) => [s.id, s])).values())
-        sessionStorage.setItem('medico_calendar_cache', JSON.stringify(unique))
-      } catch {}
-    }
-    if (appsRes.data) {
-      const apps = appsRes.data.map((a: any) => a.shift_id)
-      setMyApplications(apps)
-      sessionStorage.setItem('medico_apps_cache', JSON.stringify(apps))
-    }
-    if (confirmedRes.data) {
-      setMyConfirmedShifts(confirmedRes.data)
-      sessionStorage.setItem('medico_confirmed_cache', JSON.stringify(confirmedRes.data))
-    }
+    if (shiftsRes.data) setShifts(shiftsRes.data)
+    if (appsRes.data) setMyApplications(appsRes.data.map((a: any) => a.shift_id))
+    if (confirmedRes.data) setMyConfirmedShifts(confirmedRes.data)
+    if (accountRes.data) setIsVerified(!!accountRes.data.verified_at)
     if (profileRes.data) {
-      const p = profileRes.data
-      sessionStorage.setItem('medico_is_verified', String(p.is_verified === true))
-      // Guardar objetos completos {name, verified} para que el modal pueda decidir por especialidad
-      let specialtyObjects: {name: string; verified: boolean}[] = []
-      if (p.specialty) {
-        try {
-          const parsed = JSON.parse(p.specialty)
-          if (Array.isArray(parsed)) {
-            specialtyObjects = parsed
-              .map((s: any) => ({ name: String(s.name || ''), verified: s.verified === true }))
-              .filter(s => s.name)
-          }
-        } catch {}
-      }
-      setDoctorSpecialties(specialtyObjects)
-      sessionStorage.setItem('medico_specialties_cache', JSON.stringify(specialtyObjects))
+      setDoctorSpecialty(profileRes.data.specialty ?? [])
+      setDoctorSpecialtyVerified(profileRes.data.specialty_verified ?? [])
     }
-
     setIsFetching(false)
   }
 
-  const handleApply = async (shiftId: string) => {
+  function checkOverlap(shift: any): boolean {
+    return hasConflict(
+      { id: shift.id, starts_at: shift.starts_at, ends_at: shift.ends_at },
+      myConfirmedShifts,
+    )
+  }
+
+  async function handleApply(shiftId: string) {
     setLoadingBtn(shiftId)
     try {
       const res = await fetch('/api/shifts/apply', {
@@ -187,65 +91,46 @@ export default function DashboardMedico() {
         body: JSON.stringify({ shift_id: shiftId }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        alert(data.error || 'Error al postularse. Intentá de nuevo.')
-        setLoadingBtn(null)
-        return
-      }
+      if (!res.ok) { alert(data.error || 'Error al postularse.'); setLoadingBtn(null); return }
     } catch {
-      alert('Error de conexión. Intentá de nuevo.')
-      setLoadingBtn(null)
-      return
+      alert('Error de conexión.'); setLoadingBtn(null); return
     }
-
-    alert('¡Postulación enviada a la clínica con éxito!')
-
-    const newApps = [...myApplications, shiftId]
-    setMyApplications(newApps)
-    sessionStorage.setItem('medico_apps_cache', JSON.stringify(newApps))
-
+    alert('¡Postulación enviada!')
+    setMyApplications(prev => [...prev, shiftId])
     setLoadingBtn(null)
   }
 
-  const handleCancelApplication = async (shiftId: string) => {
-    if (!confirm('¿Querés retirar tu postulación para esta guardia?')) return;
+  async function handleCancelApplication(shiftId: string) {
+    if (!confirm('¿Querés retirar tu postulación para esta guardia?')) return
     setLoadingBtn(shiftId)
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const { error } = await supabase
-      .from('shift_applications')
-      .update({ status: 'cancelled' })
-      .eq('shift_id', shiftId)
-      .eq('professional_id', user?.id)
-      .eq('status', 'pending')
-
-    if (error) {
-      alert('Error al cancelar: ' + error.message)
-      setLoadingBtn(null)
-      return;
+    try {
+      const res = await fetch('/api/shifts/cancel-assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_id: shiftId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(data.error || 'Error al retirar postulación.'); setLoadingBtn(null); return }
+    } catch {
+      alert('Error de conexión.'); setLoadingBtn(null); return
     }
-
-    // --- ACTUALIZAMOS ESTADO Y CACHÉ AL INSTANTE ---
-    const newApps = myApplications.filter(id => id !== shiftId)
-    setMyApplications(newApps)
-    sessionStorage.setItem('medico_apps_cache', JSON.stringify(newApps))
-    
+    setMyApplications(prev => prev.filter(id => id !== shiftId))
     setLoadingBtn(null)
   }
 
-  const filteredShifts = shifts.filter(shift => {
-    const matchesSearch = (shift.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         shift.clinic?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesSpecialty = selectedSpecialty === 'Todas' || shift.specialty_required === selectedSpecialty;
+  const filteredShifts = shifts.filter(s => {
+    const matchesSearch = s.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.clinic?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSpecialty = selectedSpecialty === 'Todas' || s.specialty_required === selectedSpecialty
     if (filterFromDate) {
-      const shiftDay = format(parseISO(shift.date_time), 'yyyy-MM-dd');
-      if (shiftDay < filterFromDate) return false;
+      const day = format(parseISO(s.starts_at), 'yyyy-MM-dd')
+      if (day < filterFromDate) return false
     }
-    return matchesSearch && matchesSpecialty;
+    return matchesSearch && matchesSpecialty
   })
 
   const sortedShifts = [...filteredShifts].sort((a, b) => {
-    if (sortBy === 'recent') return new Date(a.date_time).getTime() - new Date(b.date_time).getTime()
+    if (sortBy === 'recent') return new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()
     if (sortBy === 'price_high') return (b.price ?? 0) - (a.price ?? 0)
     if (sortBy === 'price_low') return (a.price ?? 0) - (b.price ?? 0)
     return 0
@@ -253,16 +138,14 @@ export default function DashboardMedico() {
 
   const uniqueSpecialties = ['Todas', ...Array.from(new Set(shifts.map(s => s.specialty_required).filter(Boolean)))]
 
-  if (!mounted) return <main className="min-h-[calc(100vh-73px)] bg-slate-50"></main>
+  if (!mounted) return <main className="min-h-[calc(100vh-73px)] bg-slate-50" />
 
   return (
     <main className="min-h-[calc(100vh-73px)] bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-slate-900">Guardias disponibles</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Explora detalles de la clínica, sus reseñas y postúlate.
-          </p>
+          <p className="mt-1 text-sm text-slate-500">Explora detalles de la clínica, sus reseñas y postúlate.</p>
         </div>
 
         <FilterBar
@@ -276,7 +159,7 @@ export default function DashboardMedico() {
           setSelectedSpecialty={setSelectedSpecialty}
           sortBy={sortBy}
           setSortBy={setSortBy}
-          uniqueSpecialties={uniqueSpecialties as string[]}
+          uniqueSpecialties={uniqueSpecialties}
         />
 
         {isFetching && shifts.length === 0 ? (
@@ -286,50 +169,40 @@ export default function DashboardMedico() {
         ) : sortedShifts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm">
             <p className="text-slate-500 font-medium">No se encontraron guardias con esos filtros.</p>
-            <button onClick={() => { setSearchTerm(''); setSelectedSpecialty('Todas'); setFilterFromDate(''); }} className="mt-4 text-blue-600 font-bold hover:underline">
+            <button onClick={() => { setSearchTerm(''); setSelectedSpecialty('Todas'); setFilterFromDate('') }}
+              className="mt-4 text-blue-600 font-bold hover:underline">
               Limpiar filtros
             </button>
           </div>
         ) : (
-          <div
-            className={
-              viewMode === 'list'
-                ? 'flex flex-col gap-4'
-                : 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3'
-            }
-          >
-            {sortedShifts.map((shift) => {
-              const shiftDate = parseISO(shift.date_time)
-              const hasApplied = myApplications.includes(shift.id)
-              const hasOverlap =
-                shift.status === 'open' &&
-                checkOverlap(shiftDate, Number(shift.duration_hours) || 0, shift.id)
-
-              return (
-                <GuardiaCard
-                  key={shift.id}
-                  shift={shift}
-                  viewMode={viewMode}
-                  hasApplied={hasApplied}
-                  isConfirmed={myConfirmedShifts.some(c => c.id === shift.id)}
-                  hasOverlap={hasOverlap}
-                  onClick={() => setSelectedShift(shift)}
-                />
-              )
-            })}
+          <div className={viewMode === 'list' ? 'flex flex-col gap-4' : 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3'}>
+            {sortedShifts.map((shift) => (
+              <GuardiaCard
+                key={shift.id}
+                shift={shift}
+                viewMode={viewMode}
+                hasApplied={myApplications.includes(shift.id)}
+                isConfirmed={myConfirmedShifts.some(c => c.id === shift.id)}
+                hasOverlap={checkOverlap(shift)}
+                onClick={() => setSelectedShift(shift)}
+              />
+            ))}
           </div>
         )}
       </div>
 
       {selectedShift && (
-        <ExplorarGuardiaModal 
+        <ExplorarGuardiaModal
           shift={selectedShift}
           hasApplied={myApplications.includes(selectedShift.id)}
-          hasOverlap={selectedShift.status === 'open' && checkOverlap(parseISO(selectedShift.date_time), Number(selectedShift.duration_hours) || 0, selectedShift.id)}
+          hasOverlap={checkOverlap(selectedShift)}
           onClose={() => setSelectedShift(null)}
           onApply={handleApply}
           onWithdraw={handleCancelApplication}
           loadingBtn={loadingBtn}
+          isVerified={isVerified}
+          doctorSpecialty={doctorSpecialty}
+          doctorSpecialtyVerified={doctorSpecialtyVerified}
         />
       )}
     </main>

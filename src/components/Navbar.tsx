@@ -26,7 +26,7 @@ export default function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
-  const unreadCount = notifications.filter(n => !n.is_read).length
+  const unreadCount = notifications.filter(n => !n.read_at).length
 
   // Cerramos el menú móvil automáticamente al cambiar de ruta
   useEffect(() => {
@@ -38,10 +38,10 @@ export default function Navbar() {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user || null)
       if (user) {
-        const { data } = await supabase.from('profiles').select('role, full_name, is_verified, avatar_url, whatsapp').eq('id', user.id).single()
+        const { data } = await supabase.from('accounts').select('role, full_name, verified_at, avatar_url, whatsapp').eq('id', user.id).single()
         setRole(data?.role ?? null)
         setProfileName(data?.full_name ?? null)
-        setIsVerified(data?.is_verified ?? null)
+        setIsVerified(data?.verified_at ? true : null)
         setAvatarUrl(data?.avatar_url ?? null)
         setProfileWhatsapp(data?.whatsapp ?? null)
         fetchNotifications(user.id)
@@ -52,10 +52,10 @@ export default function Navbar() {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null)
       if (session?.user) {
-        supabase.from('profiles').select('role, full_name, is_verified, avatar_url, whatsapp').eq('id', session.user.id).single().then(({ data }) => {
+        supabase.from('accounts').select('role, full_name, verified_at, avatar_url, whatsapp').eq('id', session.user.id).single().then(({ data }) => {
           setRole(data?.role ?? null)
           setProfileName(data?.full_name ?? null)
-          setIsVerified(data?.is_verified ?? null)
+          setIsVerified(data?.verified_at ? true : null)
           setAvatarUrl(data?.avatar_url ?? null)
           setProfileWhatsapp(data?.whatsapp ?? null)
         })
@@ -92,8 +92,9 @@ export default function Navbar() {
     if (unreadCount === 0) return;
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return;
-    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false)
-    setNotifications(notifications.map(n => ({ ...n, is_read: true })))
+    const now = new Date().toISOString()
+    await supabase.from('notifications').update({ read_at: now }).eq('user_id', user.id).is('read_at', null)
+    setNotifications(notifications.map(n => ({ ...n, read_at: now })))
   }
 
   const toggleNotifications = async () => {
@@ -105,9 +106,10 @@ export default function Navbar() {
   const handleNotificationClick = async (notif: any) => {
     setShowNotifications(false);
 
-    if (!notif.is_read) {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', notif.id)
-      setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n))
+    if (!notif.read_at) {
+      const now = new Date().toISOString()
+      await supabase.from('notifications').update({ read_at: now }).eq('id', notif.id)
+      setNotifications(notifications.map(n => n.id === notif.id ? { ...n, read_at: now } : n))
     }
 
     // "Guardia Cubierta" es solo informativa: no abrir calendario ni modal de postulación
@@ -115,7 +117,7 @@ export default function Navbar() {
 
     if (notif.shift_id) {
       if (role === 'doctor') router.push(`/calendario-medico?shiftId=${notif.shift_id}`)
-      else if (role === 'clinic_admin') router.push(`/dashboard-clinica?shiftId=${notif.shift_id}`)
+      else if (role === 'clinic') router.push(`/panel-clinica?shiftId=${notif.shift_id}`)
     }
   }
 
@@ -157,7 +159,7 @@ export default function Navbar() {
           {/* Desktop nav */}
           {user && (
             <nav className="hidden items-center gap-1 md:flex">
-              {role === 'super_admin' && (
+              {role === 'admin' && (
                 <Link
                   href="/super-admin-guardian"
                   className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname === '/super-admin-guardian' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
@@ -166,7 +168,7 @@ export default function Navbar() {
                   Centro de Mando
                 </Link>
               )}
-              {role === 'clinic_admin' && (
+              {role === 'clinic' && (
                 <>
                   <Link
                     href="/panel-clinica"
@@ -241,7 +243,7 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                {role === 'clinic_admin' && (
+                {role === 'clinic' && (
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(true)}
@@ -279,10 +281,10 @@ export default function Navbar() {
                             <div
                               key={notif.id}
                               onClick={() => handleNotificationClick(notif)}
-                              className={`px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer ${notif.is_read ? 'opacity-75' : 'bg-blue-50/30'} ${notif.title === 'Guardia Cubierta' ? 'cursor-default hover:bg-transparent' : ''}`}
+                              className={`px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer ${notif.read_at ? 'opacity-75' : 'bg-blue-50/30'} ${notif.title === 'Guardia Cubierta' ? 'cursor-default hover:bg-transparent' : ''}`}
                             >
                               <p className="text-xs font-bold text-slate-900 mb-0.5">{notif.title}</p>
-                              <p className="text-xs text-slate-600 leading-snug">{notif.message}</p>
+                              <p className="text-xs text-slate-600 leading-snug">{notif.body}</p>
                             </div>
                           ))
                         )}
@@ -372,18 +374,18 @@ export default function Navbar() {
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900 truncate">{displayName}</p>
                       <p className="text-xs text-slate-500">
-                        {role === 'clinic_admin' ? 'Panel de Clínica' : role === 'doctor' ? 'Médico' : role === 'super_admin' ? 'Administrador' : 'Usuario'}
+                        {role === 'clinic' ? 'Panel de Clínica' : role === 'doctor' ? 'Médico' : role === 'admin' ? 'Administrador' : 'Usuario'}
                       </p>
                     </div>
                   </div>
                   <nav className="flex flex-col gap-1">
-                    {role === 'super_admin' && (
+                    {role === 'admin' && (
                       <Link href="/super-admin-guardian" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/super-admin-guardian' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
                         <LayoutDashboard className="h-4 w-4" />
                         Centro de Mando
                       </Link>
                     )}
-                    {role === 'clinic_admin' && (
+                    {role === 'clinic' && (
                       <>
                         <Link href="/panel-clinica" className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/panel-clinica' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
                           <LayoutDashboard className="h-4 w-4" />
@@ -418,7 +420,7 @@ export default function Navbar() {
                         </Link>
                       </>
                     )}
-                    {role !== 'clinic_admin' && (
+                    {role !== 'clinic' && (
                       <Link href="/perfil" className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${pathname === '/perfil' ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>
                         <User className="h-4 w-4" />
                         Mi Perfil
@@ -430,7 +432,7 @@ export default function Navbar() {
                   </nav>
                   <div className="my-3 border-t border-slate-200" />
                   <div className="flex flex-col gap-2">
-                    {role === 'clinic_admin' && (
+                    {role === 'clinic' && (
                       <button
                         type="button"
                         onClick={() => { setIsMobileMenuOpen(false); setIsModalOpen(true); }}

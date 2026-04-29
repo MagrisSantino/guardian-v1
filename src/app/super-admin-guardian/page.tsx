@@ -4,28 +4,24 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { ShieldAlert, BadgeCheck, AlertCircle, Building2, UserCircle, ChevronDown, ChevronUp } from 'lucide-react'
 
-type Specialty = { name: string; matricula: string; verified: boolean }
-
-function parseSpecialties(raw: string | null | undefined): Specialty[] {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.map((item: any) => ({
-      name: String(item?.name ?? ''),
-      matricula: String(item?.matricula ?? ''),
-      verified: item?.verified === true,
-    }))
-  } catch {
-    return []
-  }
+type UserRow = {
+  id: string
+  role: string
+  full_name: string | null
+  email: string | null
+  avatar_url: string | null
+  verified_at: string | null
+  dni?: string | null
+  matricula?: string | null
+  specialty?: string[]
+  specialty_verified?: string[]
 }
 
 export default function SuperAdminDashboard() {
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<UserRow[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
   const [fetchingData, setFetchingData] = useState(false)
-  const [activeTab, setActiveTab] = useState<'doctor' | 'clinic_admin'>('doctor')
+  const [activeTab, setActiveTab] = useState<'doctor' | 'clinic'>('doctor')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const router = useRouter()
 
@@ -46,46 +42,73 @@ export default function SuperAdminDashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.replace('/'); return }
 
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'super_admin') {
+    const { data: adminProfile } = await supabase.from('accounts').select('role').eq('id', user.id).single()
+    if (adminProfile?.role !== 'admin') {
       router.replace('/')
       return
     }
 
-    const { data } = await supabase.from('profiles').select('*').eq('role', tab)
-    if (data) {
-      const sorted = data.sort((a, b) => (a.is_verified === b.is_verified) ? 0 : a.is_verified ? 1 : -1)
-      setUsers(sorted)
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('id, full_name, email, avatar_url, verified_at')
+      .eq('role', tab)
+
+    if (!accounts) { setInitialLoading(false); setFetchingData(false); return }
+
+    let rows: UserRow[] = accounts.map(a => ({ ...a, role: tab }))
+
+    if (tab === 'doctor' && accounts.length > 0) {
+      const ids = accounts.map(a => a.id)
+      const { data: docProfiles } = await supabase
+        .from('doctor_profiles')
+        .select('id, dni, matricula, specialty, specialty_verified')
+        .in('id', ids)
+
+      if (docProfiles) {
+        const profileMap = new Map(docProfiles.map(p => [p.id, p]))
+        rows = rows.map(r => {
+          const dp = profileMap.get(r.id)
+          return dp
+            ? { ...r, dni: dp.dni, matricula: dp.matricula, specialty: dp.specialty ?? [], specialty_verified: dp.specialty_verified ?? [] }
+            : r
+        })
+      }
     }
 
+    const sorted = rows.sort((a, b) => {
+      const av = !!a.verified_at, bv = !!b.verified_at
+      return av === bv ? 0 : av ? 1 : -1
+    })
+    setUsers(sorted)
     setInitialLoading(false)
     setFetchingData(false)
   }
 
-  async function toggleVerification(id: string, currentStatus: boolean) {
+  async function toggleVerification(id: string, currentVerifiedAt: string | null) {
+    const newVerifiedAt = currentVerifiedAt ? null : new Date().toISOString()
     setUsers(prev =>
-      prev.map(u => u.id === id ? { ...u, is_verified: !currentStatus } : u)
-         .sort((a, b) => (a.is_verified === b.is_verified) ? 0 : a.is_verified ? 1 : -1)
+      prev.map(u => u.id === id ? { ...u, verified_at: newVerifiedAt } : u)
+         .sort((a, b) => {
+           const av = !!a.verified_at, bv = !!b.verified_at
+           return av === bv ? 0 : av ? 1 : -1
+         })
     )
-    const { error } = await supabase.from('profiles').update({ is_verified: !currentStatus }).eq('id', id)
+    const { error } = await supabase.from('accounts').update({ verified_at: newVerifiedAt }).eq('id', id)
     if (error) {
       alert('Error de conexión al servidor: ' + error.message)
       checkSecurityAndFetch(false, activeTab)
     }
   }
 
-  async function toggleSpecialtyVerification(userId: string, specialtyIndex: number, specialties: Specialty[]) {
-    const updated = specialties.map((s, i) =>
-      i === specialtyIndex ? { ...s, verified: !s.verified } : s
-    )
-    const newJson = JSON.stringify(updated)
+  async function toggleSpecialtyVerification(userId: string, specialty: string, currentVerified: string[]) {
+    const newVerified = currentVerified.includes(specialty)
+      ? currentVerified.filter(s => s !== specialty)
+      : [...currentVerified, specialty]
 
-    // Optimistic update
     setUsers(prev =>
-      prev.map(u => u.id === userId ? { ...u, specialty: newJson } : u)
+      prev.map(u => u.id === userId ? { ...u, specialty_verified: newVerified } : u)
     )
-
-    const { error } = await supabase.from('profiles').update({ specialty: newJson }).eq('id', userId)
+    const { error } = await supabase.from('doctor_profiles').update({ specialty_verified: newVerified }).eq('id', userId)
     if (error) {
       alert('Error al actualizar especialidad: ' + error.message)
       checkSecurityAndFetch(false, activeTab)
@@ -102,7 +125,6 @@ export default function SuperAdminDashboard() {
     <main className="min-h-screen bg-slate-50 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
 
-        {/* Cabecera */}
         <div className="bg-slate-950 text-white rounded-3xl p-6 sm:p-10 mb-8 shadow-2xl flex items-center gap-5">
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(37,99,235,0.4)]">
             <ShieldAlert className="w-8 h-8 text-white" />
@@ -113,7 +135,6 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-200 mb-6 w-full max-w-md relative">
           <button
             onClick={() => setActiveTab('doctor')}
@@ -122,8 +143,8 @@ export default function SuperAdminDashboard() {
             <UserCircle className="w-5 h-5" /> Médicos
           </button>
           <button
-            onClick={() => setActiveTab('clinic_admin')}
-            className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'clinic_admin' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}
+            onClick={() => setActiveTab('clinic')}
+            className={`flex-1 flex justify-center items-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'clinic' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}
           >
             <Building2 className="w-5 h-5" /> Clínicas
           </button>
@@ -132,7 +153,6 @@ export default function SuperAdminDashboard() {
           )}
         </div>
 
-        {/* Lista de usuarios */}
         <div className="space-y-3">
           {users.length === 0 && !fetchingData && (
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-10 text-center text-slate-500 font-bold text-lg">
@@ -141,19 +161,19 @@ export default function SuperAdminDashboard() {
           )}
 
           {users.map(user => {
-            const specialties = activeTab === 'doctor' ? parseSpecialties(user.specialty) : []
-            const hasPendingSpecialties = specialties.some(s => !s.verified)
+            const specialties = user.specialty ?? []
+            const specialtyVerified = user.specialty_verified ?? []
+            const hasPendingSpecialties = specialties.some(s => !specialtyVerified.includes(s))
             const isExpanded = expandedId === user.id
+            const isVerified = !!user.verified_at
 
             return (
               <div key={user.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                {/* Fila principal */}
                 <div className="flex flex-wrap items-center gap-3 p-5">
-                  {/* Info del usuario */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-black text-slate-900 text-base truncate">{user.full_name || 'Sin nombre'}</p>
-                      {user.is_verified ? (
+                      {isVerified ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-black rounded-full border border-emerald-200 shrink-0">
                           <BadgeCheck className="w-3.5 h-3.5" /> APROBADO
                         </span>
@@ -177,7 +197,6 @@ export default function SuperAdminDashboard() {
                     )}
                   </div>
 
-                  {/* Botones de acción */}
                   <div className="flex items-center gap-2 shrink-0">
                     {activeTab === 'doctor' && specialties.length > 0 && (
                       <button
@@ -190,52 +209,53 @@ export default function SuperAdminDashboard() {
                       </button>
                     )}
                     <button
-                      onClick={() => toggleVerification(user.id, user.is_verified)}
+                      onClick={() => toggleVerification(user.id, user.verified_at)}
                       className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${
-                        user.is_verified
+                        isVerified
                           ? 'bg-slate-100 text-slate-500 hover:bg-red-500 hover:text-white border border-slate-200'
                           : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/30'
                       }`}
                     >
-                      {user.is_verified ? 'Revocar' : 'Validar'}
+                      {isVerified ? 'Revocar' : 'Validar'}
                     </button>
                   </div>
                 </div>
 
-                {/* Panel expandible de especialidades */}
                 {isExpanded && specialties.length > 0 && (
                   <div className="border-t border-slate-100 bg-slate-50 px-5 py-4">
                     <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Especialidades declaradas</p>
                     <div className="space-y-2">
-                      {specialties.map((spec, idx) => (
-                        <div key={idx} className="flex items-center gap-3 bg-white rounded-xl border border-slate-200 px-4 py-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-slate-900 text-sm">{spec.name || <em className="text-slate-400">Sin nombre</em>}</p>
-                            <p className="text-xs text-slate-500">{spec.matricula || 'Sin matrícula'}</p>
+                      {specialties.map((spec, idx) => {
+                        const verified = specialtyVerified.includes(spec)
+                        return (
+                          <div key={idx} className="flex items-center gap-3 bg-white rounded-xl border border-slate-200 px-4 py-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-slate-900 text-sm">{spec || <em className="text-slate-400">Sin nombre</em>}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {verified ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700">
+                                  <BadgeCheck className="w-4 h-4" /> Verificada
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700">
+                                  <AlertCircle className="w-4 h-4" /> Pendiente
+                                </span>
+                              )}
+                              <button
+                                onClick={() => toggleSpecialtyVerification(user.id, spec, specialtyVerified)}
+                                className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                                  verified
+                                    ? 'bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-700 border border-slate-200'
+                                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                }`}
+                              >
+                                {verified ? 'Revocar' : 'Validar'}
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {spec.verified ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700">
-                                <BadgeCheck className="w-4 h-4" /> Verificada
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700">
-                                <AlertCircle className="w-4 h-4" /> Pendiente
-                              </span>
-                            )}
-                            <button
-                              onClick={() => toggleSpecialtyVerification(user.id, idx, specialties)}
-                              className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
-                                spec.verified
-                                  ? 'bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-700 border border-slate-200'
-                                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                              }`}
-                            >
-                              {spec.verified ? 'Revocar' : 'Validar'}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 )}

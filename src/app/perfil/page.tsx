@@ -100,7 +100,17 @@ export default function Perfil() {
       return
     }
     const session = { user }
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    // Fetch from split tables: accounts + doctor_profiles or clinic_profiles
+    const { data: accountData } = await supabase.from('accounts').select('*').eq('id', user.id).single()
+    let profileData: any = null
+    if (accountData?.role === 'doctor') {
+      const { data: dp } = await supabase.from('doctor_profiles').select('*').eq('id', user.id).single()
+      profileData = dp
+    } else if (accountData?.role === 'clinic') {
+      const { data: cp } = await supabase.from('clinic_profiles').select('*').eq('id', user.id).single()
+      profileData = cp
+    }
+    const data = accountData ? { ...accountData, ...profileData, is_verified: !!accountData.verified_at } : null
     if (data) {
       setProfile(data)
       const meta = user.user_metadata || {}
@@ -108,50 +118,29 @@ export default function Perfil() {
       const birthFromMeta = meta.birth_date || ''
 
       setFullName(data.full_name || meta.full_name || '')
-      setDni(data.dni || meta.dni || '')
-      setMatricula(data.matricula || meta.matricula || '')
+      setDni((data as any).dni || meta.dni || '')
+      setMatricula((data as any).matricula || meta.matricula || '')
       setBirthDate(birthFromProfile || birthFromMeta || '')
       setWhatsapp(data.whatsapp || meta.whatsapp || '')
-      setBio(data.bio || meta.bio || '')
+      setBio((data as any).bio || meta.bio || '')
       setAvatarUrl(data.avatar_url || '')
       setCoverUrl(data.cover_url || '')
       setKmFromCba((data as any).km_from_cba ?? (meta.km_from_cba != null ? Number(meta.km_from_cba) : null))
       setUniversity((data as any).university || meta.university || '')
 
-      // Backfill: si el perfil no tiene birth_date pero el user_metadata sí,
-      // lo sincronizamos a la tabla profiles para que las clínicas vean la edad.
-      if (!birthFromProfile && birthFromMeta) {
-        supabase
-          .from('profiles')
-          .update({ birth_date: birthFromMeta })
-          .eq('id', session.user.id)
-          .then(() => {
-            // no hace falta manejar nada en UI; en el próximo fetch ya viene sincronizado
-          })
-      }
-
-      // Especialidades dinámicas: specialty guarda un JSON string
-      const rawSpecialties = data.specialty || meta.specialty
-      try {
-        if (rawSpecialties) {
-          const parsed = JSON.parse(rawSpecialties as string)
-          if (Array.isArray(parsed)) {
-            setSpecialtiesList(
-              parsed.map((item: any) => ({
-                name: String(item?.name ?? ''),
-                matricula: String(item?.matricula ?? ''),
-                verified: item?.verified === true,
-              }))
-            )
-          }
-        }
-      } catch {
-        // Si hay algún problema con el JSON, no rompemos la vista
-        setSpecialtiesList([])
-      }
+      // Especialidades: specialty text[] + specialty_verified text[]
+      const specArr: string[] = Array.isArray((data as any).specialty) ? (data as any).specialty : []
+      const specVerified: string[] = Array.isArray((data as any).specialty_verified) ? (data as any).specialty_verified : []
+      setSpecialtiesList(
+        specArr.map((name: string) => ({
+          name,
+          matricula: '',
+          verified: specVerified.includes(name),
+        }))
+      )
 
       // Experiencia dinámica: experience_tags se guarda como text[]
-      const tags = data.experience_tags
+      const tags = (data as any).experience_tags
       const tagsArray: string[] =
         Array.isArray(tags) ? tags : typeof tags === 'string' ? (tags ? [tags] : []) : []
       setExperienceList(
@@ -161,8 +150,8 @@ export default function Perfil() {
         })
       )
       
-      if (data.role === 'clinic_admin') {
-        const pt = data.prestador_type || meta.prestador_type || ''
+      if (data.role === 'clinic') {
+        const pt = (data as any).provider_type || meta.provider_type || ''
         const providerOptionsList = ['Clínica', 'Hospital', 'CAPS', 'Dispensario', 'Servicio de traslado', 'Medicina a domicilio', 'Telemedicina', 'Otro']
         if (providerOptionsList.includes(pt)) {
           setProviderType(pt)
@@ -257,47 +246,51 @@ export default function Perfil() {
 
     const normalizePhone = (raw: string) => raw.replace(/\D/g, '') || null
 
-    const updateData = profile.role === 'doctor'
-      ? {
-          full_name: fullName,
-          dni,
-          matricula,
-          university: university || null,
-          specialty: specialtiesList.length ? JSON.stringify(specialtiesList) : null,
-          whatsapp: normalizePhone(whatsapp),
-          bio: bio || null,
-          experience_tags: experienceList.map((exp) => `${exp.place} | ${exp.time}`),
-          avatar_url: avatarUrl,
-          cover_url: coverUrl,
-        }
-      : {
-          full_name: fullName,
-          prestador_type: providerType === 'Otro' ? providerTypeOther : providerType,
-          bio: institutionDescription || null,
-          location_maps: address || null,
-          whatsapp: normalizePhone(contactWhatsapp),
-          complexity: complexityTags,
-          resources: resourceTags,
-          services: serviceTags,
-          num_doctors: numDoctors !== '' ? Number(numDoctors) : null,
-          num_nurses: numNurses !== '' ? Number(numNurses) : null,
-          avatar_url: avatarUrl,
-          cover_url: coverUrl,
-          km_from_cba: kmFromCba,
-        }
+    // Update accounts table (common fields)
+    const accountUpdate = profile.role === 'doctor'
+      ? { full_name: fullName, whatsapp: normalizePhone(whatsapp), avatar_url: avatarUrl, cover_url: coverUrl }
+      : { full_name: fullName, whatsapp: normalizePhone(contactWhatsapp), avatar_url: avatarUrl, cover_url: coverUrl }
+    const { error: accountErr } = await supabase.from('accounts').update(accountUpdate).eq('id', profile.id)
+    if (accountErr) { setSaving(false); alert('Error al guardar: ' + accountErr.message); return }
 
-    const { error } = await supabase.from('profiles').update(updateData).eq('id', profile.id)
+    // Update role-specific table
+    let profileErr: any = null
+    if (profile.role === 'doctor') {
+      const { error } = await supabase.from('doctor_profiles').update({
+        dni,
+        matricula,
+        university: university || null,
+        specialty: specialtiesList.map(s => s.name).filter(Boolean),
+        bio: bio || null,
+        experience_tags: experienceList.map((exp) => `${exp.place} | ${exp.time}`),
+        km_from_cba: kmFromCba,
+      }).eq('id', profile.id)
+      profileErr = error
+    } else if (profile.role === 'clinic') {
+      const { error } = await supabase.from('clinic_profiles').update({
+        provider_type: providerType === 'Otro' ? providerTypeOther : providerType,
+        bio: institutionDescription || null,
+        location_maps: address || null,
+        complexity: complexityTags,
+        resources: resourceTags,
+        services: serviceTags,
+        num_doctors: numDoctors !== '' ? Number(numDoctors) : null,
+        num_nurses: numNurses !== '' ? Number(numNurses) : null,
+      }).eq('id', profile.id)
+      profileErr = error
+    }
+
     setSaving(false)
-    if (!error) {
-      const hasPending = specialtiesList.some(s => s.verified === false)
-      if (hasPending) {
+    if (!profileErr) {
+      const hasPending = specialtiesList.some(s => !s.verified)
+      if (hasPending && profile.role === 'doctor') {
         alert('Perfil actualizado.\n\nTus especialidades nuevas quedaron pendientes de validación. Nuestro equipo las revisará y las aprobará a la brevedad.')
       } else {
         alert('Perfil actualizado correctamente')
       }
       fetchProfile()
     } else {
-      alert('Error al guardar: ' + error.message)
+      alert('Error al guardar: ' + profileErr.message)
     }
   }
 
@@ -309,7 +302,7 @@ export default function Perfil() {
   if (loading) return <div className="min-h-[calc(100vh-73px)] flex items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div></div>
 
   const isDoctor = profile?.role === 'doctor'
-  const isVerified = profile?.is_verified
+  const isVerified = !!profile?.verified_at
 
   const calculatedAge = (() => {
     if (!birthDate) return null

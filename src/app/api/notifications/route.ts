@@ -8,7 +8,7 @@ import {
   sendNuevaGuardiaPublicadaEmail,
   sendNuevaPostulacionEmail,
 } from '@/lib/mailer'
-import { isGeneralSpecialty, specialtiesMatch } from '@/lib/specialties'
+import { isGeneralSpecialty } from '@/lib/specialties'
 
 type NotificationAction =
   | 'NEW_SHIFT'
@@ -16,7 +16,6 @@ type NotificationAction =
   | 'NEW_APPLICATION'
   | 'DOCTOR_CANCELLED'
 
-// Rate limiter en memoria (best-effort en single-instance; usar Redis en producción multi-instancia).
 const _rateLimitMap = new Map<string, number>()
 const RATE_LIMIT_MS = 30_000
 
@@ -26,7 +25,6 @@ function isRateLimited(key: string): boolean {
   if (last && now - last < RATE_LIMIT_MS) return true
   _rateLimitMap.set(key, now)
   if (_rateLimitMap.size > 10_000) {
-    // Limpiar entradas viejas para evitar memory leak en instancias long-lived
     for (const [k, v] of _rateLimitMap) {
       if (now - v > RATE_LIMIT_MS * 2) _rateLimitMap.delete(k)
     }
@@ -34,13 +32,18 @@ function isRateLimited(key: string): boolean {
   return false
 }
 
-type ProfilesRow = {
+type AccountRow = {
   id: string
   role: string | null
   full_name: string | null
-  admin_name: string | null
-  is_verified: boolean | null
-  specialty?: string | null
+  verified_at: string | null
+}
+
+type DoctorPublicRow = {
+  id: string
+  full_name: string | null
+  specialty: string[] | null
+  specialty_verified: string[] | null
 }
 
 type ShiftRow = {
@@ -48,17 +51,16 @@ type ShiftRow = {
   title: string | null
   shift_category: string | null
   specialty_required: string | null
-  date_time: string | null
-  duration_hours: number | null
+  starts_at: string | null
+  ends_at: string | null
   price: number | null
   clinic_id: string
-  professional_id: string | null
+  assigned_doctor_id: string | null
 }
 
 type NotificationsRequestBody = {
   action: NotificationAction
   shift_id?: string
-  professional_id?: string
   doctor_id?: string
 }
 
@@ -69,7 +71,6 @@ function getActionBodyGuard(body: unknown): NotificationsRequestBody | null {
   return b as NotificationsRequestBody
 }
 
-/** Para logs: no imprimir el correo completo en terminal. */
 function maskEmail(email: string): string {
   const at = email.indexOf('@')
   if (at <= 0) return '***'
@@ -108,7 +109,7 @@ async function getEmailByUserId(admin: SupabaseAdminClient, userId: string): Pro
 async function getShiftOrThrow(admin: SupabaseAdminClient, shiftId: string): Promise<ShiftRow> {
   const { data, error } = await admin
     .from('shifts')
-    .select('id,title,shift_category,specialty_required,date_time,duration_hours,price,clinic_id,professional_id')
+    .select('id,title,shift_category,specialty_required,starts_at,ends_at,price,clinic_id,assigned_doctor_id')
     .eq('id', shiftId)
     .single()
 
@@ -118,56 +119,38 @@ async function getShiftOrThrow(admin: SupabaseAdminClient, shiftId: string): Pro
   return data as unknown as ShiftRow
 }
 
-async function getProfileOrThrow(admin: SupabaseAdminClient, profileId: string): Promise<ProfilesRow> {
+async function getAccountOrThrow(admin: SupabaseAdminClient, accountId: string): Promise<AccountRow> {
   const { data, error } = await admin
-    .from('profiles')
-    .select('id,role,full_name,admin_name,is_verified')
-    .eq('id', profileId)
+    .from('accounts')
+    .select('id,role,full_name,verified_at')
+    .eq('id', accountId)
     .single()
 
-  if (error) throw new Error(`Error consultando profile: ${error.message}`)
-  if (!data) throw new Error('Profile no encontrada')
+  if (error) throw new Error(`Error consultando account: ${error.message}`)
+  if (!data) throw new Error('Account no encontrada')
 
-  return data as unknown as ProfilesRow
+  return data as unknown as AccountRow
 }
 
-async function getVerifiedDoctors(admin: SupabaseAdminClient): Promise<ProfilesRow[]> {
+async function getVerifiedDoctors(admin: SupabaseAdminClient): Promise<DoctorPublicRow[]> {
   const { data, error } = await admin
-    .from('profiles')
-    .select('id,role,full_name,admin_name,is_verified,specialty')
+    .from('accounts_public')
+    .select('id,full_name,specialty,specialty_verified')
     .eq('role', 'doctor')
     .eq('is_verified', true)
 
   if (error) throw new Error(`Error consultando médicos verificados: ${error.message}`)
-  return (data ?? []) as unknown as ProfilesRow[]
+  return (data ?? []) as unknown as DoctorPublicRow[]
 }
 
-/**
- * Determina si un médico debe recibir el mail de una guardia con la especialidad dada.
- * - Guardias generales (Generalista, Médico Clínico, Medicina de Emergencias): todos los médicos verificados.
- * - Guardias con especialidad específica: solo médicos que tengan esa especialidad en su perfil
- *   (con verified=true, o sin campo verified para compatibilidad con registros previos).
- */
-function doctorMatchesSpecialty(doctor: ProfilesRow, shiftSpecialty: string | null): boolean {
+function doctorMatchesSpecialty(doctor: DoctorPublicRow, shiftSpecialty: string | null): boolean {
   if (isGeneralSpecialty(shiftSpecialty)) return true
-
-  if (!doctor.specialty) return false
-  try {
-    const specialties = JSON.parse(doctor.specialty)
-    if (!Array.isArray(specialties)) return false
-    return specialties.some(
-      (s: any) =>
-        specialtiesMatch(String(s?.name ?? ''), shiftSpecialty!) &&
-        (s?.verified === true || s?.verified === undefined)
-    )
-  } catch {
-    return false
-  }
+  if (!shiftSpecialty) return false
+  return doctor.specialty_verified?.includes(shiftSpecialty) ?? false
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth: accept internal secret header OR a valid authenticated session
     const internalSecret = process.env.NOTIFICATIONS_INTERNAL_SECRET
     const providedSecret = request.headers.get('X-Internal-Secret')
     const isInternalCall = internalSecret && providedSecret === internalSecret
@@ -221,7 +204,7 @@ export async function POST(request: NextRequest) {
       DOCTOR_CANCELLED: 'Médico se da de baja (asignado) → mail a la clínica',
     }
 
-    console.log('[notifications] ▶ inicio', {
+    console.log('[notifications] inicio', {
       flujo: flowLabel[body.action],
       action: body.action,
       shift_id: body.shift_id,
@@ -231,8 +214,8 @@ export async function POST(request: NextRequest) {
     const tasks: Array<Promise<unknown>> = []
 
     if (body.action === 'NEW_SHIFT') {
-      const clinicProfile = await getProfileOrThrow(supabaseAdmin, shift.clinic_id)
-      const clinicName = clinicProfile.full_name || null
+      const clinicAccount = await getAccountOrThrow(supabaseAdmin, shift.clinic_id)
+      const clinicName = clinicAccount.full_name || null
 
       const allDoctors = await getVerifiedDoctors(supabaseAdmin)
       const doctors = allDoctors.filter(doc => doctorMatchesSpecialty(doc, shift.specialty_required))
@@ -256,11 +239,11 @@ export async function POST(request: NextRequest) {
               clinicName,
               shiftCategory: shift.shift_category,
               specialtyRequired: shift.specialty_required,
-              dateTime: shift.date_time,
+              dateTime: shift.starts_at,
               price: shift.price,
             })
             console.log(
-              `[notifications] ✓ mail OK NEW_SHIFT → ${maskEmail(email)} | ${doc.full_name ?? doc.id}`,
+              `[notifications] mail OK NEW_SHIFT → ${maskEmail(email)} | ${doc.full_name ?? doc.id}`,
             )
           } catch (e) {
             console.error(
@@ -273,33 +256,32 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.action === 'SHIFT_ASSIGNED') {
-      if (!shift.professional_id) {
-        return NextResponse.json({ ok: false, error: 'Falta professional_id en la guardia' }, { status: 400 })
+      if (!shift.assigned_doctor_id) {
+        return NextResponse.json({ ok: false, error: 'Falta assigned_doctor_id en la guardia' }, { status: 400 })
       }
 
-      const doctorProfile = await getProfileOrThrow(supabaseAdmin, shift.professional_id)
-      const clinicProfile = await getProfileOrThrow(supabaseAdmin, shift.clinic_id)
-
-      const clinicName = clinicProfile.full_name || null
+      const doctorAccount = await getAccountOrThrow(supabaseAdmin, shift.assigned_doctor_id)
+      const clinicAccount = await getAccountOrThrow(supabaseAdmin, shift.clinic_id)
+      const clinicName = clinicAccount.full_name || null
 
       tasks.push((async () => {
-        const email = await getEmailByUserId(supabaseAdmin, doctorProfile.id)
+        const email = await getEmailByUserId(supabaseAdmin, doctorAccount.id)
         if (!email) {
           console.log(
-            `[notifications] SHIFT_ASSIGNED omitido: médico sin email en Auth | id=${doctorProfile.id}`,
+            `[notifications] SHIFT_ASSIGNED omitido: médico sin email en Auth | id=${doctorAccount.id}`,
           )
           return
         }
         try {
           await sendGuardiaAsignadaEmail({
             toEmail: email,
-            toName: doctorProfile.full_name,
+            toName: doctorAccount.full_name,
             shiftTitle,
             clinicName,
-            dateTime: shift.date_time,
+            dateTime: shift.starts_at,
           })
           console.log(
-            `[notifications] ✓ mail OK SHIFT_ASSIGNED → ${maskEmail(email)} | ${doctorProfile.full_name ?? doctorProfile.id} | clínica: ${clinicName ?? '—'}`,
+            `[notifications] mail OK SHIFT_ASSIGNED → ${maskEmail(email)} | ${doctorAccount.full_name ?? doctorAccount.id} | clínica: ${clinicName ?? '—'}`,
           )
         } catch (e) {
           console.error(`[notifications] mail fallido SHIFT_ASSIGNED → ${maskEmail(email)}:`, e)
@@ -308,15 +290,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.action === 'NEW_APPLICATION') {
-      const professionalId = body.professional_id ?? body.doctor_id
-      let doctorProfile: ProfilesRow | null = null
+      const doctorId = body.doctor_id
+      let doctorAccount: AccountRow | null = null
 
-      if (professionalId) {
-        doctorProfile = await getProfileOrThrow(supabaseAdmin, professionalId)
+      if (doctorId) {
+        doctorAccount = await getAccountOrThrow(supabaseAdmin, doctorId)
       } else {
         const { data, error } = await supabaseAdmin
           .from('shift_applications')
-          .select('professional_id')
+          .select('doctor_id')
           .eq('shift_id', body.shift_id)
           .eq('status', 'pending')
           .order('id', { ascending: false })
@@ -324,34 +306,34 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
 
         if (error) throw new Error(`Error consultando aplicación: ${error.message}`)
-        const pid = data?.professional_id as string | undefined
-        if (pid) doctorProfile = await getProfileOrThrow(supabaseAdmin, pid)
+        const did = data?.doctor_id as string | undefined
+        if (did) doctorAccount = await getAccountOrThrow(supabaseAdmin, did)
       }
 
-      if (!doctorProfile) {
-        return NextResponse.json({ ok: false, error: 'No se pudo determinar professional_id' }, { status: 400 })
+      if (!doctorAccount) {
+        return NextResponse.json({ ok: false, error: 'No se pudo determinar doctor_id' }, { status: 400 })
       }
 
-      const clinicProfile = await getProfileOrThrow(supabaseAdmin, shift.clinic_id)
+      const clinicAccount = await getAccountOrThrow(supabaseAdmin, shift.clinic_id)
 
       tasks.push((async () => {
-        const email = await getEmailByUserId(supabaseAdmin, clinicProfile.id)
+        const email = await getEmailByUserId(supabaseAdmin, clinicAccount.id)
         if (!email) {
           console.log(
-            `[notifications] NEW_APPLICATION omitido: clínica sin email en Auth | clinic_id=${clinicProfile.id}`,
+            `[notifications] NEW_APPLICATION omitido: clínica sin email en Auth | clinic_id=${clinicAccount.id}`,
           )
           return
         }
         try {
           await sendNuevaPostulacionEmail({
             toEmail: email,
-            clinicName: clinicProfile.full_name,
-            doctorName: doctorProfile.full_name,
+            clinicName: clinicAccount.full_name,
+            doctorName: doctorAccount.full_name,
             shiftTitle,
-            dateTime: shift.date_time,
+            dateTime: shift.starts_at,
           })
           console.log(
-            `[notifications] ✓ mail OK NUEVA_POSTULACIÓN → ${maskEmail(email)} | clínica: ${clinicProfile.full_name ?? clinicProfile.id} | postulante: ${doctorProfile.full_name ?? doctorProfile.id}`,
+            `[notifications] mail OK NUEVA_POSTULACION → ${maskEmail(email)} | clínica: ${clinicAccount.full_name ?? clinicAccount.id} | postulante: ${doctorAccount.full_name ?? doctorAccount.id}`,
           )
         } catch (e) {
           console.error(`[notifications] mail fallido NEW_APPLICATION → ${maskEmail(email)}:`, e)
@@ -360,25 +342,25 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.action === 'DOCTOR_CANCELLED') {
-      const clinicProfile = await getProfileOrThrow(supabaseAdmin, shift.clinic_id)
+      const clinicAccount = await getAccountOrThrow(supabaseAdmin, shift.clinic_id)
 
       tasks.push((async () => {
-        const email = await getEmailByUserId(supabaseAdmin, clinicProfile.id)
+        const email = await getEmailByUserId(supabaseAdmin, clinicAccount.id)
         if (!email) {
           console.log(
-            `[notifications] DOCTOR_CANCELLED omitido: clínica sin email en Auth | clinic_id=${clinicProfile.id}`,
+            `[notifications] DOCTOR_CANCELLED omitido: clínica sin email en Auth | clinic_id=${clinicAccount.id}`,
           )
           return
         }
         try {
           await sendBajaDeMedicoEmail({
             toEmail: email,
-            clinicName: clinicProfile.full_name,
+            clinicName: clinicAccount.full_name,
             shiftTitle,
-            dateTime: shift.date_time,
+            dateTime: shift.starts_at,
           })
           console.log(
-            `[notifications] ✓ mail OK BAJA_MÉDICO → ${maskEmail(email)} | clínica: ${clinicProfile.full_name ?? clinicProfile.id}`,
+            `[notifications] mail OK BAJA_MEDICO → ${maskEmail(email)} | clínica: ${clinicAccount.full_name ?? clinicAccount.id}`,
           )
         } catch (e) {
           console.error(`[notifications] mail fallido DOCTOR_CANCELLED → ${maskEmail(email)}:`, e)
@@ -387,7 +369,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (tasks.length === 0) {
-      console.log('[notifications] ■ fin (sin tareas)', {
+      console.log('[notifications] fin (sin tareas)', {
         flujo: flowLabel[body.action],
         action: body.action,
         nota: 'Ningún envío encolado (revisá condiciones del action)',
@@ -400,11 +382,11 @@ export async function POST(request: NextRequest) {
     if (rejected.length > 0) {
       for (const r of rejected) {
         if (r.status === 'rejected') {
-          console.error('[notifications] ✗ envío fallido:', r.reason)
+          console.error('[notifications] envío fallido:', r.reason)
         }
       }
     }
-    console.log('[notifications] ■ fin resumen', {
+    console.log('[notifications] fin resumen', {
       flujo: flowLabel[body.action],
       action: body.action,
       tareas_encoladas: results.length,
@@ -414,7 +396,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, action: body.action, dispatched: tasks.length })
   } catch (err) {
-    console.error('[notifications] ✗ error fatal:', err)
+    console.error('[notifications] error fatal:', err)
     return NextResponse.json({ ok: false, error: 'Error interno' }, { status: 500 })
   }
 }

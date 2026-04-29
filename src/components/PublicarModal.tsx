@@ -11,10 +11,20 @@ const HOUR_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 })
 
-const SHIFT_CATEGORY_OPTIONS = ['Guardia', 'Consultorio', 'Ambulancia'] as const
+const SHIFT_CATEGORY_OPTIONS = [
+  { value: 'guardia', label: 'Guardia' },
+  { value: 'consultorio', label: 'Consultorio' },
+  { value: 'ambulancia', label: 'Ambulancia' },
+] as const
+
 const DURATION_PILLS = [4, 6, 8, 12, 24, 'Otro'] as const
 
-function getEndTime(start: string, durationHours: number): string {
+function getEndDateTime(date: string, timeStart: string, durationHours: number): string {
+  const startMs = new Date(`${date}T${timeStart}:00`).getTime()
+  return new Date(startMs + durationHours * 3600000).toISOString()
+}
+
+function getEndTimeDisplay(start: string, durationHours: number): string {
   const [h, m] = start.split(':').map(Number)
   const totalMins = h * 60 + m + durationHours * 60
   const endH = Math.floor(totalMins / 60) % 24
@@ -23,7 +33,7 @@ function getEndTime(start: string, durationHours: number): string {
 }
 
 export default function PublicarModal({ onClose, onRefresh, selectedDate = null }: { onClose: () => void; onRefresh: () => void; selectedDate?: Date | null }) {
-  const [shiftCategory, setShiftCategory] = useState<'Guardia' | 'Consultorio' | 'Ambulancia'>('Guardia')
+  const [shiftCategory, setShiftCategory] = useState<'guardia' | 'consultorio' | 'ambulancia'>('guardia')
   const [specialty, setSpecialty] = useState<string>('Generalista')
   const [date, setDate] = useState('')
   const [timeStart, setTimeStart] = useState('08:00')
@@ -34,7 +44,7 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
   const [tiempoAPagar, setTiempoAPagar] = useState('')
   const [detallesAdicionales, setDetallesAdicionales] = useState('')
   const [loading, setLoading] = useState(false)
-  
+
   const [isVerified, setIsVerified] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
 
@@ -42,8 +52,12 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
     async function checkVerification() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const { data } = await supabase.from('profiles').select('is_verified').eq('id', user.id).single()
-        setIsVerified(data?.is_verified === true)
+        const { data } = await supabase
+          .from('accounts')
+          .select('verified_at')
+          .eq('id', user.id)
+          .single()
+        setIsVerified(!!data?.verified_at)
       }
       setCheckingAuth(false)
     }
@@ -51,20 +65,15 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
   }, [])
 
   useEffect(() => {
-    if (selectedDate) {
-      setDate(format(selectedDate, 'yyyy-MM-dd'))
-    } else {
-      setDate(format(new Date(), 'yyyy-MM-dd'))
-    }
+    setDate(selectedDate ? format(selectedDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
   }, [selectedDate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!isVerified) return // Doble barrera
+    if (!isVerified) return
     setLoading(true)
 
-    const specialtyRequired = specialty
-    if (!specialtyRequired) {
+    if (!specialty) {
       alert('Completá la especialidad requerida.')
       setLoading(false)
       return
@@ -92,14 +101,13 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
       setLoading(false)
       return
     }
-    const shiftDateTime = new Date(`${date}T${timeStart}:00`)
-    if (shiftDateTime <= new Date()) {
+
+    const startsAt = new Date(`${date}T${timeStart}:00`)
+    if (startsAt <= new Date()) {
       alert('La fecha y hora de la guardia deben ser en el futuro.')
       setLoading(false)
       return
     }
-
-    const dateTimeISO = new Date(`${date}T${timeStart}:00`).toISOString()
 
     try {
       const res = await fetch('/api/shifts/create', {
@@ -107,9 +115,9 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           shift_category: shiftCategory,
-          specialty_required: specialtyRequired,
-          date_time: dateTimeISO,
-          duration_hours: durationHours,
+          specialty_required: specialty,
+          starts_at: startsAt.toISOString(),
+          ends_at: getEndDateTime(date, timeStart, durationHours),
           price: parsedPrice,
           viaticos: viaticosExtra,
           payment_timeframe: tiempoAPagar || null,
@@ -151,6 +159,8 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
     )
   }
 
+  const displayDuration = durationPreset === 'Otro' ? (parseFloat(durationHoursCustom) || 0) : durationPreset
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-2xl shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95">
@@ -169,11 +179,11 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Tipo de Servicio</label>
               <select
                 value={shiftCategory}
-                onChange={e => setShiftCategory(e.target.value as 'Guardia' | 'Consultorio' | 'Ambulancia')}
+                onChange={e => setShiftCategory(e.target.value as 'guardia' | 'consultorio' | 'ambulancia')}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900"
               >
                 {SHIFT_CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
@@ -225,15 +235,21 @@ export default function PublicarModal({ onClose, onRefresh, selectedDate = null 
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Hora inicio</label>
               <div className="relative">
                 <Clock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                <select value={timeStart} onChange={e => setTimeStart(e.target.value)} className="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900 appearance-none cursor-pointer bg-[length:1.25rem] bg-[position:right_0.75rem_center] bg-no-repeat" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2364748b\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")' }}>
+                <select
+                  value={timeStart}
+                  onChange={e => setTimeStart(e.target.value)}
+                  className="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-semibold text-slate-900 appearance-none cursor-pointer"
+                >
                   {HOUR_OPTIONS.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
               </div>
-              <p className="text-xs text-slate-500 mt-1.5">
-                Termina a las {getEndTime(timeStart, durationPreset === 'Otro' ? (parseFloat(durationHoursCustom) || 0) : durationPreset)}
-              </p>
+              {displayDuration > 0 && (
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Termina a las {getEndTimeDisplay(timeStart, displayDuration)}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1.5">Pago Ofrecido ($)</label>

@@ -10,20 +10,7 @@ import { CalendarDays, CheckCircle2 } from 'lucide-react'
 import DetalleGuardiaMedicoModal from '@/components/DetalleGuardiaMedicoModal'
 
 export default function MisGuardiasPage() {
-  const [myGuardias, setMyGuardias] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('mis_guardias_cache')
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        sessionStorage.removeItem('mis_guardias_cache')
-      }
-    }
-    return []
-  })
+  const [myGuardias, setMyGuardias] = useState<any[]>([])
   const [selectedShift, setSelectedShift] = useState<any | null>(null)
   const [selectedUserStatus, setSelectedUserStatus] = useState<'confirmado' | 'completada' | ''>('')
   const [mounted, setMounted] = useState(false)
@@ -35,21 +22,19 @@ export default function MisGuardiasPage() {
       router.push('/login')
       return
     }
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'doctor') {
+    const { data: account } = await supabase.from('accounts').select('role').eq('id', user.id).single()
+    if (account?.role !== 'doctor') {
       router.push('/dashboard-medico')
       return
     }
     const { data } = await supabase
       .from('shifts')
-      .select('*, clinic:profiles!clinic_id(*)')
-      .eq('professional_id', user.id)
+      .select('*, clinic:accounts_public!clinic_id(id,full_name,avatar_url,cover_url,clinic_location,clinic_rating,clinic_reviews_count,num_doctors,num_nurses,resources,complexity)')
+      .eq('assigned_doctor_id', user.id)
       .in('status', ['filled', 'completed'])
-      .order('date_time', { ascending: true })
+      .order('starts_at', { ascending: true })
       .limit(200)
-    const result = data || []
-    setMyGuardias(result)
-    sessionStorage.setItem('mis_guardias_cache', JSON.stringify(result))
+    setMyGuardias(data || [])
   }
 
   useEffect(() => {
@@ -100,7 +85,7 @@ export default function MisGuardiasPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <ul className="divide-y divide-slate-100">
               {myGuardias.map((g) => {
-                const d = parseISO(g.date_time)
+                const d = parseISO(g.starts_at)
                 const isCompleted = g.status === 'completed'
                 return (
                   <li
