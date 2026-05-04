@@ -4,8 +4,9 @@ import { createSupabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { shift_id?: string }
+    const body = (await request.json()) as { shift_id?: string; actor?: string }
     const shiftId = body.shift_id?.trim()
+    const actor = body.actor?.trim()
     if (!shiftId) {
       return NextResponse.json({ ok: false, error: 'Falta shift_id' }, { status: 400 })
     }
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
+    // ── Clínica desasigna médico ──────────────────────────────────────────────
     if (account?.role === 'clinic') {
       const { data: shift, error: shiftErr } = await admin
         .from('shifts')
@@ -41,6 +43,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: false, error: 'La guardia no tiene un médico asignado' }, { status: 409 })
       }
 
+      const assignedDoctorId = shift.assigned_doctor_id
+
       const { error: shiftUpdateErr } = await admin
         .from('shifts')
         .update({ status: 'open', assigned_doctor_id: null })
@@ -51,11 +55,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Error al desasignar la guardia' }, { status: 500 })
       }
 
-      await admin
-        .from('shift_applications')
-        .update({ status: 'pending' })
-        .eq('shift_id', shiftId)
-        .eq('status', 'accepted')
+      // Rechazar la aplicación del médico desasignado para que no aparezca en la lista
+      if (assignedDoctorId) {
+        await admin
+          .from('shift_applications')
+          .update({ status: 'rejected' })
+          .eq('shift_id', shiftId)
+          .eq('doctor_id', assignedDoctorId)
+      }
 
       return NextResponse.json({ ok: true })
     }
@@ -64,17 +71,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 403 })
     }
 
+    // ── Médico cancela guardia confirmada (actor: 'doctor') ───────────────────
+    if (actor === 'doctor') {
+      const { data: shift, error: shiftErr } = await admin
+        .from('shifts')
+        .select('id, status, assigned_doctor_id')
+        .eq('id', shiftId)
+        .single()
+
+      if (shiftErr || !shift) {
+        return NextResponse.json({ ok: false, error: 'Guardia no encontrada' }, { status: 404 })
+      }
+      if (shift.status !== 'filled' || shift.assigned_doctor_id !== user.id) {
+        return NextResponse.json({ ok: false, error: 'No podés cancelar esta guardia' }, { status: 409 })
+      }
+
+      const { error: shiftUpdateErr } = await admin
+        .from('shifts')
+        .update({ status: 'open', assigned_doctor_id: null })
+        .eq('id', shiftId)
+
+      if (shiftUpdateErr) {
+        console.error('[cancel-assignment] doctor shift reset:', shiftUpdateErr.message)
+        return NextResponse.json({ ok: false, error: 'Error al cancelar la guardia' }, { status: 500 })
+      }
+
+      await admin
+        .from('shift_applications')
+        .update({ status: 'withdrawn' })
+        .eq('shift_id', shiftId)
+        .eq('doctor_id', user.id)
+
+      return NextResponse.json({ ok: true })
+    }
+
+    // ── Médico retira postulación pendiente ───────────────────────────────────
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: rpcResult, error: rpcErr } = await (supabase as any).rpc('withdraw_application', {
+    const { error: rpcErr } = await (supabase as any).rpc('withdraw_application', {
       p_shift_id: shiftId,
     })
 
     if (rpcErr) {
       return NextResponse.json({ ok: false, error: rpcErr.message ?? 'Error al retirar la postulación' }, { status: 500 })
     }
-
-    const result = rpcResult as { ok: boolean; was_accepted: boolean } | null
-    void result
 
     return NextResponse.json({ ok: true })
   } catch (e) {
