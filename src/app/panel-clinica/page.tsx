@@ -12,7 +12,7 @@ import { es } from 'date-fns/locale'
 import { useSearchParams, usePathname, useRouter } from 'next/navigation'
 import { Clock, CalendarDays, Plus, Calendar } from 'lucide-react'
 
-type GuardiaStatus = 'creada' | 'con_postulantes' | 'asignada' | 'finalizada'
+type GuardiaStatus = 'creada' | 'con_postulantes' | 'asignada' | 'finalizada' | 'cancelada'
 
 const STATUS_CONFIG: Record<GuardiaStatus, { label: string; bgClass: string; textClass: string; dotClass: string; borderLeftClass: string }> = {
   creada: {
@@ -43,10 +43,18 @@ const STATUS_CONFIG: Record<GuardiaStatus, { label: string; bgClass: string; tex
     dotClass: 'bg-slate-400',
     borderLeftClass: 'border-l-4 border-l-transparent',
   },
+  cancelada: {
+    label: 'Cancelada',
+    bgClass: 'bg-red-50/80 border-red-200/60',
+    textClass: 'text-red-600',
+    dotClass: 'bg-red-400',
+    borderLeftClass: 'border-l-4 border-l-red-400',
+  },
 }
 
 function getGuardiaStatus(shift: any): GuardiaStatus {
   if (shift.status === 'completed') return 'finalizada'
+  if (shift.status === 'cancelled') return 'cancelada'
   if (shift.status === 'filled') return 'asignada'
   const pendingApps = shift.applicants?.filter((a: any) => a.status === 'pending') || []
   if (shift.status === 'open' && pendingApps.length > 0) return 'con_postulantes'
@@ -154,6 +162,7 @@ function PanelClinicaContent() {
               if (shift.status === 'open') setIsPostulantesOpen(true)
               else if (shift.status === 'filled') setIsVerGuardiaAsignadaOpen(true)
               else if (shift.status === 'completed') alert('Esta guardia ya fue completada y el profesional fue calificado.')
+              else if (shift.status === 'cancelled') alert('Esta guardia fue cancelada.')
               router.replace(pathname, { scroll: false })
             }
           })
@@ -230,6 +239,8 @@ function PanelClinicaContent() {
                       setIsVerGuardiaAsignadaOpen(true)
                     } else if (shift.status === 'completed') {
                       alert('Esta guardia ya fue finalizada.')
+                    } else if (shift.status === 'cancelled') {
+                      alert('Esta guardia fue cancelada.')
                     } else {
                       setIsPostulantesOpen(true)
                     }

@@ -55,11 +55,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Error al desasignar la guardia' }, { status: 500 })
       }
 
-      // Rechazar la aplicación del médico desasignado para que no aparezca en la lista
+      // El médico desasignado vuelve a ser postulante (pending)
       if (assignedDoctorId) {
         await admin
           .from('shift_applications')
-          .update({ status: 'rejected' })
+          .update({ status: 'pending' })
           .eq('shift_id', shiftId)
           .eq('doctor_id', assignedDoctorId)
       }
