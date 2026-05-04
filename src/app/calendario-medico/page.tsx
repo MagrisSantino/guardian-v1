@@ -344,6 +344,7 @@ function CalendarioMedicoContent() {
       .from('shifts')
       .select('*, clinic:accounts_public!clinic_id(id,full_name,avatar_url,cover_url,clinic_location,clinic_rating,clinic_reviews_count,num_doctors,num_nurses,resources,complexity)')
       .eq('assigned_doctor_id', user.id)
+      .neq('status', 'cancelled')
       .order('starts_at', { ascending: true })
       .limit(200)
     const { data: appsData } = await supabase
