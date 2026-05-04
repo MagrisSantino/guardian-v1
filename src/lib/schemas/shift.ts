@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const createShiftSchema = z.object({
   title: z.string().max(255).optional(),
-  description: z.string().optional().default(""),
+  description: z.string().nullable().optional().default(""),
   specialty_required: z.string().min(1, "Specialty is required").max(255),
   starts_at: z
     .string()
