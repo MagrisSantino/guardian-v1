@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import DetalleGuardiaMedicoModal from '@/components/DetalleGuardiaMedicoModal'
-import ExplorarGuardiaModal from '@/components/ExplorarGuardiaModal'
 import {
   format,
   addMonths,
@@ -310,8 +309,6 @@ function CalendarioMedicoContent() {
   const [selectedBlockedDates, setSelectedBlockedDates] = useState<string[]>([])
   const [isSelectingDays, setIsSelectingDays] = useState(false)
   const [selectedDayShifts, setSelectedDayShifts] = useState<any[] | null>(null)
-  const [selectedShiftForModal, setSelectedShiftForModal] = useState<any | null>(null)
-
   function checkOverlap(shift: { id: string; starts_at: string; ends_at: string }): boolean {
     return hasConflict(shift, myConfirmedShifts)
   }
@@ -862,7 +859,7 @@ function CalendarioMedicoContent() {
                                 key={shift.id}
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  if (!isSelectingDays) setSelectedShiftForModal(shift)
+                                  if (!isSelectingDays) handleShiftClick(shift)
                                 }}
                               >
                                 <GuardiaCard
@@ -925,7 +922,8 @@ function CalendarioMedicoContent() {
                 <div
                   key={s.id}
                   onClick={() => {
-                    setSelectedShiftForModal(s)
+                    setSelectedDayShifts(null)
+                    handleShiftClick(s)
                   }}
                 >
                   <GuardiaCardMobile
@@ -951,14 +949,6 @@ function CalendarioMedicoContent() {
         />
       )}
 
-      {selectedShiftForModal && (
-        <ExplorarGuardiaModal
-          shift={selectedShiftForModal}
-          hasApplied={myApplications.includes(selectedShiftForModal.id)}
-          hasOverlap={selectedShiftForModal.status === 'open' && checkOverlap(selectedShiftForModal)}
-          onClose={() => setSelectedShiftForModal(null)}
-        />
-      )}
     </main>
   )
 }
