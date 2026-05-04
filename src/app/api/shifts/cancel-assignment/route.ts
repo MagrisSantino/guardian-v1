@@ -57,11 +57,25 @@ export async function POST(request: NextRequest) {
 
       // El médico desasignado vuelve a ser postulante (pending)
       if (assignedDoctorId) {
-        await admin
+        const { error: appUpdateErr, data: updatedRows } = await admin
           .from('shift_applications')
           .update({ status: 'pending' })
           .eq('shift_id', shiftId)
           .eq('doctor_id', assignedDoctorId)
+          .select()
+
+        if (appUpdateErr) {
+          console.error('[cancel-assignment] app reset error:', appUpdateErr.message)
+        } else if (!updatedRows || updatedRows.length === 0) {
+          // No existe la aplicación — la recreamos para que quede postulado
+          console.warn('[cancel-assignment] no app row found for doctor, inserting pending')
+          const { error: insertErr } = await admin
+            .from('shift_applications')
+            .insert({ shift_id: shiftId, doctor_id: assignedDoctorId, status: 'pending' })
+          if (insertErr) {
+            console.error('[cancel-assignment] app recreate error:', insertErr.message)
+          }
+        }
       }
 
       return NextResponse.json({ ok: true })
