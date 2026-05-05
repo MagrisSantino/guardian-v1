@@ -6,8 +6,6 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "lint": "eslint",
     "db:types": "npx supabase gen types typescript --project-id cztrvwzftzkoykcryzdl --schema public > src/lib/database.types.ts"
   },
@@ -35,7 +33,6 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.15",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vitest": "^2.0.0"
+    "typescript": "^5"
   }
 }
